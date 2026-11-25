@@ -190,7 +190,7 @@ function renderEvo(m) {
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ingresos y gastos de los últimos 12 meses"><defs>
     <linearGradient id="aI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0075FF" stop-opacity=".75"/><stop offset="1" stop-color="#0075FF" stop-opacity="0"/></linearGradient>
     <linearGradient id="aG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2CD9FF" stop-opacity=".55"/><stop offset="1" stop-color="#2CD9FF" stop-opacity="0"/></linearGradient></defs>`;
-  for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); s += `<line x1="${l}" x2="${W - r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="rgba(255,255,255,.08)" stroke-dasharray="4 4"/><text x="${l - 8}" y="${(yy + 4).toFixed(1)}" font-size="11" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
+  for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); s += `<line x1="${l}" x2="${W - r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="rgba(20,26,60,.08)" stroke-dasharray="4 4"/><text x="${l - 8}" y="${(yy + 4).toFixed(1)}" font-size="11" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
   const base = y(0);
   s += `<path d="${curva(pi)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aI)"/><path d="${curva(pi)}" fill="none" stroke="#0075FF" stroke-width="3"/>`;
   s += `<path d="${curva(pg)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aG)"/><path d="${curva(pg)}" fill="none" stroke="#2CD9FF" stroke-width="3"/>`;
@@ -205,7 +205,7 @@ function renderDia(m) {
   const n = diasMes(m), vals = Array(n).fill(0);
   for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x)) { const d = Number(String(x.fecha).slice(8, 10)); if (d >= 1 && d <= n) vals[d - 1] += enUSD(x.monto, x.moneda); }
   const tot = vals.reduce((a, v) => a + v, 0);
-  $("diaSub").innerHTML = tot ? `Gastaste <b class="pos" style="color:#fff">${esc(usd(tot))}</b> en ${esc(nombreMes(m))}` : `Sin gastos en ${esc(nombreMes(m))}`;
+  $("diaSub").innerHTML = tot ? `Gastaste <b>${esc(usd(tot))}</b> en ${esc(nombreMes(m))}` : `Sin gastos en ${esc(nombreMes(m))}`;
   const W = 520, H = 170, l = 34, b = 8, top = 10, max = Math.max(...vals) * 1.1 || 1, bw = (W - l) / n;
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gasto por día">`;
   for (let k = 0; k <= 3; k++) { const v = max * k / 3, yy = top + (H - top - b) * (1 - k / 3); s += `<text x="${l - 6}" y="${(yy + 4).toFixed(1)}" font-size="10" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
