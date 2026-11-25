@@ -143,6 +143,9 @@ function renderResumen() {
   const fm = st.fijos.filter(f => f.activo !== false && fijoEnMes(f, m));
   const pend = fm.filter(f => !pagadoEnMes(f, m)).length;
   $("kFij").innerHTML = esc(usd(fm.reduce((s, f) => s + enUSD(f.monto, f.moneda), 0))) + (fm.length ? `<small class="muted">${pend} sin pagar</small>` : "");
+  $("fijMeter").style.width = fm.length ? `${Math.round((fm.length - pend) / fm.length * 100)}%` : "0%";
+  const ult = [-5, -4, -3, -2, -1, 0].map(k => totales(sumaMes(m, k)));
+  spark("spIng", ult.map(t => t.ing), "#01B574"); spark("spGas", ult.map(t => t.gas), "#F0475B"); spark("spAho", ult.map(t => t.ing - t.gas), "#0075FF");
 
   // meta
   const c = st.cfg, ini = c.inicio || CFG_DEF.inicio, fmeta = c.fecha_meta || CFG_DEF.fecha_meta, meta = Number(c.meta) || 0;
@@ -171,6 +174,14 @@ function renderResumen() {
   renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m);
 }
 
+function spark(id, vals, color) {
+  const el = $(id); if (!el) return;
+  if (!vals.some(v => v)) { el.innerHTML = ""; return; }
+  const W = 200, H = 38, min = Math.min(0, ...vals), max = Math.max(...vals) || 1, k = (H - 6) / ((max - min) || 1);
+  const pts = vals.map((v, i) => [i * W / (vals.length - 1), H - 3 - (v - min) * k]), gid = "g" + id;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${curva(pts)} L${W},${H} L0,${H} Z" fill="url(#${gid})"/><path d="${curva(pts)}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" opacity=".85"/></svg>`;
+}
 function curva(pts) {
   if (pts.length < 2) return "";
   let d = `M${pts[0][0]},${pts[0][1]}`;
