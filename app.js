@@ -22,7 +22,7 @@ const CUOTAS_OPC = [1, 2, 3, 4, 5, 6, 9, 10, 12, 18, 24];
 const TIPOS_DEU = { cuotas: "Compra en cuotas", prestamo: "Préstamo o crédito", persona: "Deuda con una persona", otro: "Otra deuda" };
 const CFG_DEF = { tarjetas: TARJETAS_DEF, meta: 12500, fecha_meta: "2027-11-30", inicio: "2026-12-01", tasas: { USD: 1, EUR: 1.15, ARS: 0.0008, MXN: 0.055, COP: 0.00026, GBP: 1.3, CLP: 0.00105 } };
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-const VISTAS = [["resumen","Resumen","home"],["movimientos","Movimientos","list"],["fijos","Pagos fijos","repeat"],["deudas","Deudas","debt"],["ajustes","Topes y ajustes","gear"]];
+const VISTAS = [["resumen","Resumen","home"],["movimientos","Movimientos","list"],["fijos","Pagos fijos","repeat"],["deudas","Deudas","debt"],["proyeccion","Proyección","chart"],["ajustes","Topes y ajustes","gear"]];
 
 const I = {
   home: '<path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -33,6 +33,7 @@ const I = {
   card: '<path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2zm0 4h20v6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3zm4 5h5v-2H6z"/>',
   piggy: '<path d="M19 9.5c.6-.3 1.2-.5 2-.5v3h1v4h-2.2a7.9 7.9 0 0 1-2.8 2.5V21h-3v-1.6a9 9 0 0 1-3 0V21H8v-2.5A7 7 0 0 1 4 12a7 7 0 0 1 7-7h2c2.5 0 4.7 1.3 6 3.3zM16 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM9 4.5a2.5 2.5 0 1 1 5 0z"/>',
   debt: '<path fill-rule="evenodd" d="M6 2h12a1 1 0 0 1 1 1v19l-2.5-1.6L14 22l-2-1.6-2 1.6-2.5-1.6L5 22V3a1 1 0 0 1 1-1Zm3 5v2h6V7zm0 4v2h6v-2zm0 4v2h4v-2z"/>',
+  chart: '<path d="M4 4v15a1 1 0 0 0 1 1h15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M8 15l4-4.5 3 3L20 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
   cal: '<path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2h2zM5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/>',
 };
 const svgIco = (k, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${I[k] || ""}</svg>`;
@@ -191,6 +192,7 @@ function render() {
   if (st.vista === "movimientos") renderMovs();
   if (st.vista === "fijos") { renderFijos($("tCobros"), true, true); renderFijos($("tFijos"), true); }
   if (st.vista === "deudas") renderDeudasVista();
+  if (st.vista === "proyeccion") renderProy();
   if (st.vista === "ajustes") renderCfg();
 }
 
@@ -261,7 +263,7 @@ function renderResumen() {
   $("ringVal").textContent = t.ing > 0 ? `${Math.round(aho / t.ing * 100)}%` : "—";
   $("ringT1").textContent = L === "agencia" ? "Margen" : "Ahorro"; $("ringT2").textContent = L === "agencia" ? "de lo cobrado" : "de lo que entró";
 
-  renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m); renderDeudas($("deuR"), $("deuSubR"), false); renderTopes(); renderProy();
+  renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m); renderDeudas($("deuR"), $("deuSubR"), false); renderTopes();
 }
 
 function spark(id, vals, color) {

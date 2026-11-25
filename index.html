@@ -310,7 +310,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
   .f3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;justify-content:space-around;
     padding:8px max(10px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px));background:#14110D;border-top:1px solid var(--oro-borde);box-shadow:0 -8px 24px rgba(20,14,6,.3)}
-  .tabs button{background:none;border:0;display:grid;justify-items:center;gap:3px;font-size:.66rem;font-weight:600;color:rgba(255,255,255,.6);padding:4px 8px}
+  .tabs button{background:none;border:0;display:grid;justify-items:center;gap:3px;font-size:.64rem;font-weight:600;color:rgba(255,255,255,.6);padding:4px 3px;min-width:0}
   .tabs button[aria-current="page"]{color:var(--oro-claro)}
   .tabs button[aria-current="page"] svg{color:var(--oro)}
   .fab{display:grid;place-items:center;position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:31;width:58px;height:58px;border-radius:18px;border:0;
@@ -425,11 +425,6 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
         <div id="deuR"></div>
       </div>
 
-      <div class="card">
-        <div class="card-head"><div><h2>Proyección · próximos 12 meses</h2><div class="sub" id="proySub">—</div></div></div>
-        <div id="proy"></div>
-      </div>
-
       <div class="row-c">
         <div class="card">
           <div class="card-head"><div><h2>Pagos fijos</h2><div class="sub" id="fijSub">—</div></div><button class="btn sm ghost" data-go="fijos">Ver todos</button></div>
@@ -534,6 +529,14 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
           <div class="hint" id="dHint">Si tiene interés, poné el total que vas a pagar (cuota × cantidad).</div>
           <button class="btn" type="submit">Guardar</button>
         </form>
+      </div>
+    </section>
+
+    <!-- PROYECCIÓN -->
+    <section data-view="proyeccion" class="grid" hidden>
+      <div class="card">
+        <div class="card-head"><div><h2>Proyección · próximos 12 meses</h2><div class="sub" id="proySub">—</div></div></div>
+        <div id="proy"></div>
       </div>
     </section>
 
