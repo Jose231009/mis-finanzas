@@ -261,18 +261,27 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 #titulo small.personal{color:#0B7FA8;background:#EEF8FC;border:1px solid rgba(11,127,168,.35)} #titulo small.agencia{color:#5B3FD6;background:#F3F0FF;border:1px solid rgba(91,63,214,.3)}
 .mover{font-size:.72rem!important;padding:4px 8px!important}
 
-/* login */
-.login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px));color:#fff;
-  --acc-bg:#0075FF; --acc-ink:#fff; --acc-edge:transparent; --acc-shadow:0 6px 18px rgba(0,117,255,.35); --brand-bg:linear-gradient(135deg,#0075FF,#2CD9FF); --brand-ink:#fff; --focus:#2CD9FF;
-  --glass:linear-gradient(127deg, rgba(6,11,40,.94) 19%, rgba(10,14,35,.52) 77%); --edge:rgba(255,255,255,.08); --ink:#fff; --muted:#A0AEC0; --soft:#718096;
-  background:radial-gradient(1200px 700px at 85% -10%, #1B2A7A 0%, transparent 55%), radial-gradient(900px 600px at -10% 110%, #11186A 0%, transparent 60%),
-    linear-gradient(160deg,#0F123B 0%,#070B26 45%,#020515 100%)}
-.login .card{background:var(--glass);border:1px solid var(--edge);box-shadow:none;backdrop-filter:blur(40px)}
+/* login: negro cálido con dorado, como la app */
+.login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px));color:#F5EBD6;
+  --acc-bg:linear-gradient(135deg,#F3DCA2 0%,#D4AF6A 45%,#A27B34 100%); --acc-ink:#16130F; --acc-edge:transparent; --acc-shadow:0 12px 28px -12px rgba(212,175,106,.6); --focus:#D4AF6A;
+  --edge:rgba(212,175,106,.28); --ink:#F5EBD6; --muted:#B8AC93; --soft:#8C826E;
+  background:radial-gradient(900px 600px at 50% -15%, rgba(212,175,106,.17) 0%, transparent 60%), radial-gradient(700px 500px at 105% 110%, rgba(162,123,52,.13) 0%, transparent 60%),
+    linear-gradient(170deg,#1A1611 0%,#0D0B09 50%,#050404 100%)}
+.login .card{width:min(400px,100%);padding:34px 30px 24px;background:linear-gradient(160deg,rgba(40,34,27,.82),rgba(14,12,10,.9));border:1px solid rgba(212,175,106,.35);
+  box-shadow:inset 0 1px 0 rgba(255,236,190,.08), 0 30px 60px -22px rgba(0,0,0,.75);backdrop-filter:blur(30px)}
 .login .card::before,.login .card::after{display:none}
-.login input{background:#0F1535;border-color:rgba(226,232,240,.14);color:#fff}
-.login input::placeholder{color:#5A6A8A}
-.login .card{width:min(420px,100%);padding:28px}
-.login h1{font-size:1.5rem;margin-bottom:6px}
+.login-top{display:grid;justify-items:center;text-align:center;gap:4px;margin-bottom:24px}
+.login-top img{width:76px;height:76px;filter:drop-shadow(0 14px 26px rgba(212,175,106,.22))}
+.login-top h1{font-size:2rem;letter-spacing:-.02em;margin:12px 0 0;background:linear-gradient(135deg,#F7E2AE 0%,#D4AF6A 55%,#B08433 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.login-top p{margin:0;color:var(--muted);font-size:.92rem}
+.login label{color:var(--muted)}
+.login input{background:#14110D;border-color:rgba(212,175,106,.25);color:#F5EBD6}
+.login input:focus{border-color:#D4AF6A;outline:none;box-shadow:0 0 0 3px rgba(212,175,106,.18)}
+.login input::placeholder{color:#6E6555}
+.login .btn{width:100%;padding:13px 16px;font-size:.96rem;border-radius:14px}
+.login .priv{display:flex;align-items:center;justify-content:center;gap:6px;margin:2px 0 0;font-size:.76rem;color:var(--soft)}
+.login .priv svg{color:#D4AF6A}
+.login .hint{text-align:center;color:var(--soft);margin:0}
 .err{color:#FF8A98;font-size:.82rem;min-height:1.2em}
 
 /* celular */
@@ -306,15 +315,18 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 <body>
 <div id="vLogin" class="login" hidden>
   <div class="card">
-    <div class="brand" style="border:0;padding:0 0 16px"><img class="logo" src="logo-96.png" alt="" width="32" height="32"> AL DÍA</div>
-    <h1>Entrá a tus finanzas</h1>
-    <p class="muted" style="margin:0 0 16px">Es privado: solo tu usuario puede ver estos datos.</p>
+    <div class="login-top">
+      <img src="logo-96.png" alt="" width="76" height="76">
+      <h1>Al Día</h1>
+      <p>Tus finanzas, siempre al día.</p>
+    </div>
     <form id="fLogin" autocomplete="on">
-      <label>Correo<input id="lEmail" type="email" autocomplete="username" required></label>
-      <label>Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
+      <label>Correo<input id="lEmail" type="email" autocomplete="username" required placeholder="tu@correo.com"></label>
+      <label>Contraseña<input id="lPass" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
       <div class="err" id="lErr"></div>
       <button class="btn" type="submit" id="lBtn">Entrar</button>
-      <p class="hint">¿No tenés contraseña? Creala en leads.atraelab.com/forgot-password con este mismo correo y volvé acá.</p>
+      <p class="priv"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>Privado: solo vos ves estos datos</p>
+      <p class="hint">¿No tenés contraseña? Creala en leads.atraelab.com/forgot-password con este mismo correo.</p>
     </form>
   </div>
 </div>
