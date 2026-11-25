@@ -394,7 +394,7 @@ input::placeholder{color:#A9A6B8}
       <div class="row-c">
         <div class="card">
           <div class="card-head"><div><h2>Pagos fijos</h2><div class="sub" id="fijSub">—</div></div><button class="btn sm ghost" data-go="fijos">Ver todos</button></div>
-          <div class="tbl"><table><thead><tr><th>Pago</th><th class="hide-m">De quién</th><th>Próximo</th><th class="n">USD</th><th>Este mes</th></tr></thead><tbody id="tFijosR"></tbody></table></div>
+          <div class="tbl"><table><thead><tr><th>Pago</th><th class="hide-m">De quién</th><th>Próximo</th><th class="n" data-disp>USD</th><th>Este mes</th></tr></thead><tbody id="tFijosR"></tbody></table></div>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>Dónde podés ahorrar</h2><div class="sub" id="insSub">—</div></div></div>
@@ -414,15 +414,19 @@ input::placeholder{color:#A9A6B8}
             <input id="busca" type="search" placeholder="Buscar…" style="max-width:200px">
           </div>
         </div>
-        <div class="tbl"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th class="n">Monto</th><th class="n">USD</th><th></th></tr></thead><tbody id="tMovs"></tbody></table></div>
+        <div class="tbl"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th class="n">Monto</th><th class="n" data-disp>USD</th><th></th></tr></thead><tbody id="tMovs"></tbody></table></div>
       </div>
     </section>
 
     <!-- PAGOS FIJOS -->
     <section data-view="fijos" class="grid" hidden>
+      <div class="card" id="cardCobros" hidden>
+        <div class="card-head"><div><h2>Cobros fijos</h2><div class="sub">Lo que te entra todos los meses. Tocá «Cobré» cuando te llegue y queda como ingreso del mes.</div></div></div>
+        <div class="tbl"><table><thead><tr><th>Cobro</th><th>De quién</th><th>Próximo</th><th class="n">Monto</th><th class="n" data-disp>USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tCobros"></tbody></table></div>
+      </div>
       <div class="card">
-        <div class="card-head"><div><h2>Pagos y cobros fijos</h2><div class="sub">Sueldo, alquiler, luz, gas, tarjetas, apps de la agencia… Marcá «Pagué» o «Cobré» y queda en el mes.</div></div></div>
-        <div class="tbl"><table><thead><tr><th>Pago</th><th>De quién</th><th>Próximo</th><th class="n">Monto</th><th class="n">USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tFijos"></tbody></table></div>
+        <div class="card-head"><div><h2>Pagos fijos y suscripciones</h2><div class="sub">Alquiler, luz, gas, tarjetas, colegio, apps de la agencia… Tocá «Pagué» cuando lo pagás y queda como gasto del mes.</div></div></div>
+        <div class="tbl"><table><thead><tr><th>Pago</th><th>De quién</th><th>Próximo</th><th class="n">Monto</th><th class="n" data-disp>USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tFijos"></tbody></table></div>
       </div>
       <div class="card">
         <div class="card-head"><h2>Agregar pago o cobro fijo</h2></div>

@@ -40,8 +40,16 @@ const svgIco = (k, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 2
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
-const usd = (n) => "US$ " + fmt0.format(Math.round(n || 0));
-const usdC = (n) => { const a = Math.abs(n || 0); return "US$ " + (a >= 10000 ? (a / 1000).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " mil" : fmt0.format(Math.round(a))); };
+// Montos en pantalla: lo personal en pesos, la agencia y «Todo» en dólares. La meta de ahorro siempre en dólares.
+const SIMB = { USD: "US$", ARS: "$", EUR: "€", GBP: "£" };
+const disp = () => (typeof st !== "undefined" && st.libro === "personal") ? "ARS" : "USD";
+const tasaDe = (m) => Number(((typeof st !== "undefined" && st.cfg.tasas) || {})[m] ?? CFG_DEF.tasas[m] ?? 1);
+const fmtMon = (n, m) => m === "EUR" ? `${fmt0.format(Math.round(n || 0))} €` : `${SIMB[m] || m} ${fmt0.format(Math.round(n || 0))}`;
+const aDisp = (nUSD) => (nUSD || 0) / tasaDe(disp());                 // dólares → moneda en pantalla
+const usd = (nUSD) => fmtMon(aDisp(nUSD), disp());                     // (se llama usd por historia: formatea en la moneda en pantalla)
+const usdFijo = (n) => "US$ " + fmt0.format(Math.round(n || 0));
+const corto = (a) => a >= 1e6 ? (a / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M" : a >= 1e4 ? Math.round(a / 1000).toLocaleString("es-AR") + " mil" : fmt0.format(Math.round(a));
+const usdC = (nUSD) => `${SIMB[disp()] || disp()} ${corto(Math.abs(aDisp(nUSD)))}`;
 const fmtNum = (n, m) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(n) + " " + m;
 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const mesDe = (f) => String(f || "").slice(0, 7);
@@ -122,6 +130,7 @@ function nav() {
   const t = VISTAS.find(v => v[0] === st.vista)[1]; $("crumb").textContent = t;
   $("titulo").innerHTML = esc(t) + (st.libro === "todo" ? "" : ` <small class="${st.libro}">${NOM_AMB[st.libro]}</small>`);
   document.querySelectorAll("#libroSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.libro === st.libro));
+  document.querySelectorAll("[data-disp]").forEach(th => (th.textContent = disp() === "ARS" ? "Pesos" : "USD"));
 }
 document.querySelectorAll(".icon[data-i]").forEach(el => (el.innerHTML = svgIco(el.dataset.i, 22)));
 $("mPrev").onclick = () => { st.mes = sumaMes(st.mes, -1); render(); };
@@ -159,7 +168,7 @@ function render() {
   nav(); $("mLbl").textContent = nombreMes(st.mes);
   if (st.vista === "resumen") renderResumen();
   if (st.vista === "movimientos") renderMovs();
-  if (st.vista === "fijos") renderFijos($("tFijos"), true);
+  if (st.vista === "fijos") { renderFijos($("tCobros"), true, true); renderFijos($("tFijos"), true); }
   if (st.vista === "deudas") renderDeudasVista();
   if (st.vista === "ajustes") renderCfg();
 }
@@ -193,23 +202,26 @@ function renderResumen() {
   const esperado = meta * transcurrido / mesesTot;
   $("metaFill").style.width = pct.toFixed(1) + "%"; $("metaBar").setAttribute("aria-valuenow", pct.toFixed(0));
   $("metaPct").textContent = `${pct.toFixed(0)} %`;
-  $("metaAcum").textContent = usd(Math.max(0, acum)); $("metaDe").textContent = `de ${usd(meta)} ahorrados`;
-  $("metaFin").textContent = `${usd(meta)} · ${mesCorto(fmeta)}`;
-  $("metaFalta").textContent = usd(Math.max(0, meta - acum));
-  $("metaMes").textContent = usd(antes ? meta / mesesTot : porMes);
+  $("metaAcum").textContent = usdFijo(Math.max(0, acum)); $("metaDe").textContent = `de ${usdFijo(meta)} ahorrados`;
+  $("metaFin").textContent = `${usdFijo(meta)} · ${mesCorto(fmeta)}`;
+  $("metaFalta").textContent = usdFijo(Math.max(0, meta - acum));
+  $("metaMes").textContent = usdFijo(antes ? meta / mesesTot : porMes);
   const hoyEl = $("metaHoy"); hoyEl.hidden = antes || !meta; if (meta) hoyEl.style.left = Math.min(100, esperado / meta * 100).toFixed(1) + "%";
   $("metaRitmoT").textContent = antes ? "Empieza a contar" : "Deberías tener hoy";
-  $("metaRitmo").textContent = antes ? ini.split("-").reverse().join("/") : usd(esperado);
+  $("metaRitmo").textContent = antes ? ini.split("-").reverse().join("/") : usdFijo(esperado);
   $("metaSub").innerHTML = antes ? esc(`Empieza el ${ini.split("-").reverse().join("/")}`)
     : `Hasta el ${esc(fmeta.split("-").reverse().join("/"))} · <b class="${acum >= esperado ? "pos" : "neg"}">${acum >= esperado ? "vas adelantado" : "vas atrás"}</b>`;
   const margen = t.iA > 0 ? Math.round(t.ganancia / t.iA * 100) : 0;
+  const porCobrar = L === "agencia" ? [] : st.fijos.filter(f => f.activo !== false && esCobro(f) && f.ambito === "personal" && fijoEnMes(f, m) && !pagadoEnMes(f, m));
+  const falta = porCobrar.length ? ` Falta cobrar: ${porCobrar.map(f => `${f.nombre} (${usd(enUSD(f.monto, f.moneda))})`).join(", ")}.` : "";
   $("helloTxt").textContent = L === "agencia"
     ? (t.iA ? `Este mes la agencia cobró ${usd(t.iA)} y gastó ${usd(t.gA)}: te deja ${usd(t.ganancia)} (${margen} % de margen).` : `Todavía no hay cobros de clientes este mes. La agencia lleva gastados ${usd(t.gA)}.`)
     : L === "personal"
     ? `La agencia te dejó ${usd(t.ganancia)}${t.iP ? ` y entraron ${usd(t.iP)} de lo tuyo` : ""}. En lo personal gastaste ${usd(t.gP)}: te quedan ${usd(aho)}.`
     : antes
     ? `Tu meta: ${usd(meta)} para el ${fmeta.split("-").reverse().join("/")}. Este mes cargá todo para ver en qué se va la plata.`
-    : (aho >= porMes ? `Vas bien: este mes te quedan ${usd(aho)}, más de los ${usd(porMes)} que necesitás.` : `Este mes te faltan ${usd(Math.max(0, porMes - aho))} para ir al ritmo de tu meta.`);
+    : (aho >= porMes ? `Vas bien: este mes te quedan ${usd(aho)}, más de los ${usdFijo(porMes)} que necesitás.` : `Este mes te faltan ${usd(Math.max(0, porMes - aho))} para ir al ritmo de tu meta.`);
+  if (falta) $("helloTxt").textContent += falta;
 
   // ritmo
   const n = diasMes(m), esAct = m === actual, dHoy = esAct ? Number(hoy().slice(8, 10)) : n;
@@ -251,7 +263,7 @@ function renderEvo(m) {
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ingresos y gastos de los últimos 12 meses"><defs>
     <linearGradient id="aI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4AF6A" stop-opacity=".7"/><stop offset="1" stop-color="#D4AF6A" stop-opacity="0"/></linearGradient>
     <linearGradient id="aG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A332B" stop-opacity=".28"/><stop offset="1" stop-color="#3A332B" stop-opacity="0"/></linearGradient></defs>`;
-  for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); s += `<line x1="${l}" x2="${W - r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="rgba(20,26,60,.08)" stroke-dasharray="4 4"/><text x="${l - 8}" y="${(yy + 4).toFixed(1)}" font-size="11" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
+  for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); s += `<line x1="${l}" x2="${W - r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="rgba(20,26,60,.08)" stroke-dasharray="4 4"/><text x="${l - 8}" y="${(yy + 4).toFixed(1)}" font-size="11" text-anchor="end">${esc(corto(aDisp(v)))}</text>`; }
   const base = y(0);
   s += `<path d="${curva(pi)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aI)"/><path d="${curva(pi)}" fill="none" stroke="#B8862F" stroke-width="3"/>`;
   s += `<path d="${curva(pg)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aG)"/><path d="${curva(pg)}" fill="none" stroke="#2B2620" stroke-width="2.5"/>`;
@@ -270,7 +282,7 @@ function renderDia(m) {
   $("diaSub").innerHTML = tot ? `${quien} <b>${esc(usd(tot))}</b> en ${esc(nombreMes(m))}` : `Sin gastos en ${esc(nombreMes(m))}`;
   const W = 520, H = 170, l = 34, b = 8, top = 10, max = Math.max(...vals) * 1.1 || 1, bw = (W - l) / n;
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gasto por día">`;
-  for (let k = 0; k <= 3; k++) { const v = max * k / 3, yy = top + (H - top - b) * (1 - k / 3); s += `<text x="${l - 6}" y="${(yy + 4).toFixed(1)}" font-size="10" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
+  for (let k = 0; k <= 3; k++) { const v = max * k / 3, yy = top + (H - top - b) * (1 - k / 3); s += `<text x="${l - 6}" y="${(yy + 4).toFixed(1)}" font-size="10" text-anchor="end">${esc(corto(aDisp(v)))}</text>`; }
   vals.forEach((v, i) => { const h = (H - top - b) * v / max, xx = l + i * bw + bw / 2 - 2.5;
     s += `<rect x="${xx.toFixed(1)}" y="${(H - b - Math.max(2, h)).toFixed(1)}" width="5" height="${Math.max(2, h).toFixed(1)}" rx="2.5" fill="${v ? "#E9C97F" : "rgba(240,215,155,.14)"}"><title>${i + 1}: ${esc(usd(v))}</title></rect>`; });
   $("gDia").innerHTML = s + "</svg>";
@@ -286,11 +298,11 @@ function renderStats(m) {
   const max = Math.max(...items.map(i => i[1])) || 1;
   $("stats").innerHTML = items.map(([n, v, k]) => `<div class="stat"><div class="h"><i>${esc(k)}</i>${esc(n)}</div><b class="num">${esc(usd(v))}</b><div class="pbar"><i style="width:${(v / max * 100).toFixed(0)}%"></i></div></div>`).join("");
 }
-function renderFijos(tb, completo) {
+function renderFijos(tb, completo, cobros = false) {
   const m = st.mes, ref = m === mesDe(hoy()) ? hoy() : m + "-01", h0 = new Date(hoy() + "T00:00:00");
-  const fs = st.fijos.filter(f => f.activo !== false && enLibro(f)).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => esCobro(b.f) - esCobro(a.f) || a.p - b.p || enUSD(b.f.monto, b.f.moneda) - enUSD(a.f.monto, a.f.moneda));
-  const pagos = fs.filter(x => !esCobro(x.f)), cobros = fs.filter(x => esCobro(x.f));
-  if (!completo) $("fijSub").textContent = fs.length ? `${pagos.length} pagos · ${usd(pagos.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes${cobros.length ? ` · cobrás ${usd(cobros.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))}` : ""}` : "Todavía no cargaste ninguno";
+  const fs = st.fijos.filter(f => f.activo !== false && enLibro(f) && esCobro(f) === cobros).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => a.p - b.p || enUSD(b.f.monto, b.f.moneda) - enUSD(a.f.monto, a.f.moneda));
+  if (cobros) $("cardCobros").hidden = !fs.length;
+  if (!completo) $("fijSub").textContent = fs.length ? `${fs.length} pagos · ${usd(fs.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes` : "Todavía no cargaste ninguno";
   const cols = completo ? 7 : 5;
   if (!fs.length) { tb.innerHTML = `<tr><td colspan="${cols}"><div class="empty">Cargá alquiler, luz, gas, tarjeta y las apps de la agencia en «Pagos fijos».</div></td></tr>`; return; }
   tb.innerHTML = (completo ? fs : fs.slice(0, 6)).map(({ f, p }) => {
@@ -300,7 +312,7 @@ function renderFijos(tb, completo) {
     const amb = `<span class="chip ${esc(f.ambito)}">${f.ambito === "agencia" ? "Agencia" : "Personal"}</span>`;
     const prox = p.toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
     const pausa = (f.pausa_meses || []).length ? ` · sin pago en ${f.pausa_meses.map(k => MESES[k - 1]).join(" y ")}` : "";
-    const nombre = `<b>${esc(f.nombre)}</b>${cobro ? ` <span class="chip ok">cobro</span>` : ""}${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}${esc(pausa)}</div>`;
+    const nombre = `<b>${esc(f.nombre)}</b>${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}${esc(pausa)}</div>`;
     const usdTxt = `${cobro ? "+" : ""}${usd(enUSD(f.monto, f.moneda))}`;
     if (!completo) return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td></tr>`;
     const borrar = st.borrando === "f:" + f.id ? `<button class="btn sm danger" data-del-f="${esc(f.id)}">Borrar</button> <button class="btn sm ghost" data-cancel>No</button>` : `<button class="btn sm ghost" data-ask="f:${esc(f.id)}" aria-label="Borrar">×</button>`;
@@ -325,9 +337,9 @@ function estadoDeuda(d) {
 }
 function tileDeuda(d, e, completo) {
   const quien = d.tipo === "cuotas" ? ((st.cfg.tarjetas || []).includes(d.acreedor) ? `Tarjeta ${d.acreedor}` : (d.acreedor || "En cuotas")) : (d.acreedor || TIPOS_DEU[d.tipo] || "");
-  const det = [quien, e.n ? `${e.n} cuotas de ${usd(enUSD(e.cuotaMonto, d.moneda))}` : "sin cuotas"].filter(Boolean).join(" · ");
+  const det = [quien, e.n ? `${e.n} cuotas de ${fmtMon(e.cuotaMonto, d.moneda)}` : "sin cuotas"].filter(Boolean).join(" · ");
   const chip = e.terminada ? `<span class="chip ok">pagada</span>` : e.n ? `<span class="chip num">cuota ${e.cuotaAct} de ${e.n}</span>` : `<span class="chip num">${Math.round(e.pct)} %</span>`;
-  const pie = e.terminada ? "Terminaste de pagarla." : [e.fin ? `Terminás en ${mesCorto(e.fin)}` : "Sin fecha de fin", e.porMes ? `${usd(enUSD(e.porMes, d.moneda))} por mes` : ""].filter(Boolean).join(" · ");
+  const pie = e.terminada ? "Terminaste de pagarla." : [e.fin ? `Terminás en ${mesCorto(e.fin)}` : "Sin fecha de fin", e.porMes ? `${fmtMon(e.porMes, d.moneda)} por mes` : ""].filter(Boolean).join(" · ");
   let acc = "";
   if (completo) {
     const borrar = st.borrando === "d:" + d.id
@@ -343,7 +355,7 @@ function tileDeuda(d, e, completo) {
   }
   return `<div class="deu"><div class="deu-h"><div><b>${esc(d.nombre)}</b><small>${esc(det)}</small></div>${chip}</div>
     <div class="hbar" role="progressbar" aria-label="Pagado de ${esc(d.nombre)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(e.pct)}"><i style="width:${e.pct.toFixed(1)}%"></i></div>
-    <div class="deu-f"><span>Pagaste <b class="num">${esc(usd(enUSD(e.pagado, d.moneda)))}</b></span><span class="q">Quedan <b class="num">${esc(usd(enUSD(e.resta, d.moneda)))}</b></span></div>
+    <div class="deu-f"><span>Pagaste <b class="num">${esc(fmtMon(e.pagado, d.moneda))}</b></span><span class="q">Quedan <b class="num">${esc(fmtMon(e.resta, d.moneda))}</b></span></div>
     <div class="deu-x">${esc(pie)}</div>${acc}</div>`;
 }
 function renderDeudas(el, subEl, completo) {
@@ -376,8 +388,7 @@ function formDeuda() {
 ["dTipo", "dCuotas", "dTotal", "dMon", "dAmb"].forEach(id => $(id).addEventListener("input", formDeuda));
 
 // ---------- topes de gasto ----------
-const SIM = { USD: "US$", EUR: "€", GBP: "£" };
-const enMon = (n, mo) => mo === "USD" ? usd(n) : `${fmt0.format(Math.round(n || 0))} ${SIM[mo] || mo}`;
+const enMon = (n, mo) => fmtMon(n, mo);
 const deUSD = (v, mo) => v / Number((st.cfg.tasas || {})[mo] ?? CFG_DEF.tasas[mo] ?? 1);
 const ORDEN_P = { semanal: 0, quincenal: 1, mensual: 2 };
 const pad2 = (x) => String(x).padStart(2, "0");
@@ -546,7 +557,8 @@ function hint() {
   const v = $("mMonto").value, conCuotas = st.tipo === "gasto" && !!tarjetaSel(), k = conCuotas ? Number($("mCuotas").value) || 1 : 1;
   $("mCuotasRow").hidden = !conCuotas;
   $("mCuotasHint").textContent = k > 1 ? (v ? `${k} cuotas de ${usd(enUSD(v / k, $("mMoneda").value))}, una por mes` : "Poné arriba el total de la compra") : "";
-  $("mHint").textContent = v ? `= ${usd(enUSD(v, $("mMoneda").value))}${k > 1 ? " en total" : ""}${NO_SUMA.has(st.cat) ? " · el resumen de la tarjeta no suma (sus consumos ya están cargados)" : ""}` : (k > 1 ? "Monto total de la compra" : "Se pasa solo a dólares");
+  const conv = $("mMoneda").value !== disp();
+  $("mHint").textContent = v ? `${conv ? `= ${usd(enUSD(v, $("mMoneda").value))}` : fmtMon(Number(v), $("mMoneda").value)}${k > 1 ? " en total" : ""}${NO_SUMA.has(st.cat) ? " · el resumen de la tarjeta no suma (sus consumos ya están cargados)" : ""}` : (k > 1 ? "Monto total de la compra" : disp() === "ARS" ? "Lo ves en pesos; si cargás en otra moneda, se pasa sola" : "Se pasa solo a dólares");
   const de = st.ambito === "agencia" ? "de la agencia" : "personal";
   $("mGuardar").textContent = st.tipo === "ingreso" ? `Guardar ingreso ${de}` : k > 1 ? `Guardar compra ${de} en ${k} cuotas` : `Guardar gasto ${de}`;
   $("sheetT").textContent = `${st.tipo === "ingreso" ? "Nuevo ingreso" : "Nuevo gasto"} ${de}`;
@@ -720,6 +732,7 @@ function demo() {
   }
   st.fijos = [["Alquiler", "personal", "Alquiler", 950, "EUR", 1], ["Luz", "personal", "Luz", 60, "EUR", 12], ["Claude", "agencia", "Apps y suscripciones", 200, "USD", 18], ["Make", "agencia", "Apps y suscripciones", 29, "USD", 22]]
     .map(([nombre, ambito, categoria, monto, moneda, dia], i) => ({ id: "f" + i, nombre, ambito, categoria, monto, moneda, dia, frecuencia: "mensual", activo: true }));
+  st.fijos.push({ id: "fs", nombre: "Sueldo (ejemplo)", tipo: "ingreso", ambito: "personal", categoria: "Sueldo", monto: 7200000, moneda: "ARS", dia: 1, frecuencia: "mensual", activo: true });
   st.cfg.inicio = sumaMes(mes0, -1) + "-01";
   const ini4 = addMeses(hoy(), -4, 10);
   st.deudas = [
