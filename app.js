@@ -60,13 +60,17 @@ const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { retur
 const ddmm = (f) => `${String(f).slice(8, 10)}/${String(f).slice(5, 7)}`;
 
 const st = { user: null, demo: false, movs: [], crm: [], fijos: [], deudas: [], pagosDeu: [], pagando: null, cfg: structuredClone(CFG_DEF), mes: mesDe(hoy()), vista: "resumen",
-  tipo: "gasto", ambito: "personal", cat: null, filtro: "todos", q: "", borrando: null };
+  tipo: "gasto", ambito: "personal", cat: null, libro: "todo", q: "", borrando: null };
 
 function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 2800); }
 const enUSD = (monto, moneda) => (Number(monto) || 0) * Number((st.cfg.tasas || {})[moneda] ?? CFG_DEF.tasas[moneda] ?? 1);
 const cuenta = (x) => !NO_SUMA.has(x.categoria);
 const todos = () => st.movs.concat(st.crm);
 const delMes = (m) => todos().filter(x => mesDe(x.fecha) === m);
+// «libro»: qué se mira. todo = todo junto · personal · agencia
+const NOM_AMB = { personal: "Personal", agencia: "Agencia" };
+const enLibro = (x) => st.libro === "todo" || x.ambito === st.libro;
+try { const l = localStorage.getItem("mf-libro"); if (["todo", "personal", "agencia"].includes(l)) st.libro = l; } catch {}
 
 // ---------- auth ----------
 async function iniciar() {
@@ -114,21 +118,27 @@ function nav() {
   $("nav").innerHTML = VISTAS.map(([k, t, i]) => `<button data-go="${k}" ${st.vista === k ? 'aria-current="page"' : ""}><span class="ico">${svgIco(i, 16)}</span>${esc(t)}</button>`).join("");
   $("tabs").innerHTML = VISTAS.map(([k, t, i]) => `<button data-go="${k}" ${st.vista === k ? 'aria-current="page"' : ""}>${svgIco(i, 20)}${esc(t.split(" ")[0])}</button>`).join("");
   document.querySelectorAll("[data-view]").forEach(s => (s.hidden = s.dataset.view !== st.vista));
-  const t = VISTAS.find(v => v[0] === st.vista)[1]; $("crumb").textContent = t; $("titulo").textContent = t;
+  const t = VISTAS.find(v => v[0] === st.vista)[1]; $("crumb").textContent = t;
+  $("titulo").innerHTML = esc(t) + (st.libro === "todo" ? "" : ` <small class="${st.libro}">${NOM_AMB[st.libro]}</small>`);
+  document.querySelectorAll("#libroSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.libro === st.libro));
 }
 document.querySelectorAll(".icon[data-i]").forEach(el => (el.innerHTML = svgIco(el.dataset.i, 22)));
 $("mPrev").onclick = () => { st.mes = sumaMes(st.mes, -1); render(); };
 $("mNext").onclick = () => { st.mes = sumaMes(st.mes, 1); render(); };
 
 // ---------- cálculos ----------
-function totales(m) {
-  let ing = 0, gas = 0, gP = 0, gA = 0;
+// Personal: la ganancia de la agencia (cobros − gastos de la agencia) entra como ingreso tuyo, junto con tus otros ingresos.
+function totales(m, L = st.libro) {
+  let iP = 0, iA = 0, gP = 0, gA = 0;
   for (const x of delMes(m)) {
     const v = enUSD(x.monto, x.moneda);
-    if (x.tipo === "ingreso") ing += v;
-    else if (cuenta(x)) { gas += v; x.ambito === "agencia" ? (gA += v) : (gP += v); }
+    if (x.tipo === "ingreso") x.ambito === "agencia" ? (iA += v) : (iP += v);
+    else if (cuenta(x)) x.ambito === "agencia" ? (gA += v) : (gP += v);
   }
-  return { ing, gas, gP, gA };
+  const ganancia = iA - gA;
+  const ing = L === "agencia" ? iA : L === "personal" ? iP + ganancia : iP + iA;
+  const gas = L === "agencia" ? gA : L === "personal" ? gP : gP + gA;
+  return { ing, gas, gP, gA, iP, iA, ganancia };
 }
 function proximoPago(f, ref) {
   const [y, mo, d] = ref.split("-").map(Number), dia = Math.max(1, Math.min(31, Number(f.dia) || 1));
@@ -153,12 +163,17 @@ function render() {
 }
 
 function renderResumen() {
-  const m = st.mes, actual = mesDe(hoy()), t = totales(m), p = totales(sumaMes(m, -1));
+  const m = st.mes, actual = mesDe(hoy()), t = totales(m), p = totales(sumaMes(m, -1)), L = st.libro;
+  const ET = { todo: ["Ingresos del mes", "Gastos del mes", "Te queda", "Pagos fijos del mes"],
+    personal: ["Ingresos personales", "Gastos personales", "Te queda", "Pagos fijos personales"],
+    agencia: ["Cobros de la agencia", "Gastos de la agencia", "Ganancia de la agencia", "Pagos fijos de la agencia"] }[L];
+  ["kIngT", "kGasT", "kAhoT", "kFijT"].forEach((id, i) => ($(id).textContent = ET[i]));
+  $("kIngT").title = L === "personal" ? `Incluye ${usd(t.ganancia)} que te dejó la agencia (cobros menos gastos de la agencia)` : "";
   $("kIng").innerHTML = esc(usd(t.ing)) + delta(t.ing, p.ing);
   $("kGas").innerHTML = esc(usd(t.gas)) + deltaGasto(t.gas, p.gas);
   const aho = t.ing - t.gas;
   $("kAho").innerHTML = `<span class="${aho >= 0 ? "" : "neg"}">${esc(usd(aho))}</span>`;
-  const fm = st.fijos.filter(f => f.activo !== false && fijoEnMes(f, m));
+  const fm = st.fijos.filter(f => f.activo !== false && enLibro(f) && fijoEnMes(f, m));
   const pend = fm.filter(f => !pagadoEnMes(f, m)).length;
   $("kFij").innerHTML = esc(usd(fm.reduce((s, f) => s + enUSD(f.monto, f.moneda), 0))) + (fm.length ? `<small class="muted">${pend} sin pagar</small>` : "");
   $("fijMeter").style.width = fm.length ? `${Math.round((fm.length - pend) / fm.length * 100)}%` : "0%";
@@ -185,7 +200,12 @@ function renderResumen() {
   $("metaRitmo").textContent = antes ? ini.split("-").reverse().join("/") : usd(esperado);
   $("metaSub").innerHTML = antes ? esc(`Empieza el ${ini.split("-").reverse().join("/")}`)
     : `Hasta el ${esc(fmeta.split("-").reverse().join("/"))} · <b class="${acum >= esperado ? "pos" : "neg"}">${acum >= esperado ? "vas adelantado" : "vas atrás"}</b>`;
-  $("helloTxt").textContent = antes
+  const margen = t.iA > 0 ? Math.round(t.ganancia / t.iA * 100) : 0;
+  $("helloTxt").textContent = L === "agencia"
+    ? (t.iA ? `Este mes la agencia cobró ${usd(t.iA)} y gastó ${usd(t.gA)}: te deja ${usd(t.ganancia)} (${margen} % de margen).` : `Todavía no hay cobros de clientes este mes. La agencia lleva gastados ${usd(t.gA)}.`)
+    : L === "personal"
+    ? `La agencia te dejó ${usd(t.ganancia)}${t.iP ? ` y entraron ${usd(t.iP)} de lo tuyo` : ""}. En lo personal gastaste ${usd(t.gP)}: te quedan ${usd(aho)}.`
+    : antes
     ? `Tu meta: ${usd(meta)} para el ${fmeta.split("-").reverse().join("/")}. Este mes cargá todo para ver en qué se va la plata.`
     : (aho >= porMes ? `Vas bien: este mes te quedan ${usd(aho)}, más de los ${usd(porMes)} que necesitás.` : `Este mes te faltan ${usd(Math.max(0, porMes - aho))} para ir al ritmo de tu meta.`);
 
@@ -197,6 +217,7 @@ function renderResumen() {
   const tasa = t.ing > 0 ? Math.max(0, Math.min(100, aho / t.ing * 100)) : 0;
   $("ringArc").setAttribute("stroke-dashoffset", (390 * (1 - tasa / 100)).toFixed(1));
   $("ringVal").textContent = t.ing > 0 ? `${Math.round(aho / t.ing * 100)}%` : "—";
+  $("ringT1").textContent = L === "agencia" ? "Margen" : "Ahorro"; $("ringT2").textContent = L === "agencia" ? "de lo cobrado" : "de lo que entró";
 
   renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m); renderDeudas($("deuR"), $("deuSubR"), false);
 }
@@ -220,7 +241,7 @@ function curva(pts) {
   return d;
 }
 function renderEvo(m) {
-  const meses = Array.from({ length: 12 }, (_, i) => sumaMes(m, i - 11)), ts = meses.map(totales);
+  const meses = Array.from({ length: 12 }, (_, i) => sumaMes(m, i - 11)), ts = meses.map(mm => totales(mm));
   if (!ts.some(t => t.ing || t.gas)) { $("gEvo").innerHTML = `<div class="empty">Cuando haya movimientos, acá ves la curva de ingresos y gastos.</div>`; return; }
   const W = 720, H = 300, l = 52, r = 10, top = 14, b = 30, max = Math.max(...ts.map(t => Math.max(t.ing, t.gas))) * 1.1 || 1;
   const x = (i) => l + (W - l - r) * i / 11, y = (v) => top + (H - top - b) * (1 - v / max);
@@ -241,9 +262,10 @@ function renderEvo(m) {
 }
 function renderDia(m) {
   const n = diasMes(m), vals = Array(n).fill(0);
-  for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x)) { const d = Number(String(x.fecha).slice(8, 10)); if (d >= 1 && d <= n) vals[d - 1] += enUSD(x.monto, x.moneda); }
+  for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x) && enLibro(x)) { const d = Number(String(x.fecha).slice(8, 10)); if (d >= 1 && d <= n) vals[d - 1] += enUSD(x.monto, x.moneda); }
   const tot = vals.reduce((a, v) => a + v, 0);
-  $("diaSub").innerHTML = tot ? `Gastaste <b>${esc(usd(tot))}</b> en ${esc(nombreMes(m))}` : `Sin gastos en ${esc(nombreMes(m))}`;
+  const quien = st.libro === "agencia" ? "La agencia gastó" : st.libro === "personal" ? "En lo personal gastaste" : "Gastaste";
+  $("diaSub").innerHTML = tot ? `${quien} <b>${esc(usd(tot))}</b> en ${esc(nombreMes(m))}` : `Sin gastos en ${esc(nombreMes(m))}`;
   const W = 520, H = 170, l = 34, b = 8, top = 10, max = Math.max(...vals) * 1.1 || 1, bw = (W - l) / n;
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gasto por día">`;
   for (let k = 0; k <= 3; k++) { const v = max * k / 3, yy = top + (H - top - b) * (1 - k / 3); s += `<text x="${l - 6}" y="${(yy + 4).toFixed(1)}" font-size="10" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
@@ -253,13 +275,18 @@ function renderDia(m) {
 }
 function renderStats(m) {
   const t = totales(m), cat = (k) => delMes(m).filter(x => x.tipo === "gasto" && x.categoria === k).reduce((a, x) => a + enUSD(x.monto, x.moneda), 0);
-  const items = [["Personal", t.gP, "P"], ["Agencia", t.gA, "A"], ["Uber y transporte", cat("Uber y transporte"), "U"], ["Comidas y delivery", cat("Comidas y delivery"), "C"]];
+  let items = [["Personal", t.gP, "P"], ["Agencia", t.gA, "A"], ["Uber y transporte", cat("Uber y transporte"), "U"], ["Comidas y delivery", cat("Comidas y delivery"), "C"]];
+  if (st.libro !== "todo") {
+    const mapa = new Map(); for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x) && x.ambito === st.libro) mapa.set(x.categoria, (mapa.get(x.categoria) || 0) + enUSD(x.monto, x.moneda));
+    items = [...mapa.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => [k, v, k.charAt(0).toUpperCase()]);
+    if (!items.length) { $("stats").innerHTML = `<div class="hint">Sin gastos ${st.libro === "agencia" ? "de la agencia" : "personales"} en ${esc(nombreMes(m))}.</div>`; return; }
+  }
   const max = Math.max(...items.map(i => i[1])) || 1;
   $("stats").innerHTML = items.map(([n, v, k]) => `<div class="stat"><div class="h"><i>${esc(k)}</i>${esc(n)}</div><b class="num">${esc(usd(v))}</b><div class="pbar"><i style="width:${(v / max * 100).toFixed(0)}%"></i></div></div>`).join("");
 }
 function renderFijos(tb, completo) {
   const m = st.mes, ref = m === mesDe(hoy()) ? hoy() : m + "-01", h0 = new Date(hoy() + "T00:00:00");
-  const fs = st.fijos.filter(f => f.activo !== false).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => a.p - b.p);
+  const fs = st.fijos.filter(f => f.activo !== false && enLibro(f)).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => a.p - b.p);
   if (!completo) $("fijSub").textContent = fs.length ? `${fs.length} pagos · ${usd(fs.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes` : "Todavía no cargaste ninguno";
   const cols = completo ? 7 : 5;
   if (!fs.length) { tb.innerHTML = `<tr><td colspan="${cols}"><div class="empty">Cargá alquiler, luz, gas, tarjeta y las apps de la agencia en «Pagos fijos».</div></td></tr>`; return; }
@@ -314,7 +341,7 @@ function tileDeuda(d, e, completo) {
     <div class="deu-x">${esc(pie)}</div>${acc}</div>`;
 }
 function renderDeudas(el, subEl, completo) {
-  const xs = st.deudas.filter(d => d.activo !== false).map(d => ({ d, e: estadoDeuda(d) }));
+  const xs = st.deudas.filter(d => d.activo !== false && enLibro(d)).map(d => ({ d, e: estadoDeuda(d) }));
   const vivas = xs.filter(x => !x.e.terminada).sort((a, b) => enUSD(b.e.resta, b.d.moneda) - enUSD(a.e.resta, a.d.moneda));
   const listas = xs.filter(x => x.e.terminada);
   const debes = vivas.reduce((a, x) => a + enUSD(x.e.resta, x.d.moneda), 0), porMes = vivas.reduce((a, x) => a + enUSD(x.e.porMes, x.d.moneda), 0);
@@ -343,39 +370,41 @@ function formDeuda() {
 ["dTipo", "dCuotas", "dTotal", "dMon", "dAmb"].forEach(id => $(id).addEventListener("input", formDeuda));
 
 function renderIns(m) {
-  $("insSub").textContent = nombreMes(m);
+  $("insSub").textContent = `${nombreMes(m)} · ${st.libro === "agencia" ? "gastos de la agencia" : "gastos personales"}`;
   const prevs = [1, 2, 3].map(k => sumaMes(m, -k)), conDatos = prevs.filter(pm => delMes(pm).some(x => x.tipo === "gasto")).length;
   const cur = new Map(), avg = new Map();
-  for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x) && x.ambito === "personal" && !FIJAS.has(x.categoria)) cur.set(x.categoria, (cur.get(x.categoria) || 0) + enUSD(x.monto, x.moneda));
-  for (const pm of prevs) for (const x of delMes(pm)) if (x.tipo === "gasto" && cuenta(x) && x.ambito === "personal") avg.set(x.categoria, (avg.get(x.categoria) || 0) + enUSD(x.monto, x.moneda) / Math.max(1, conDatos));
+  const amb = st.libro === "agencia" ? "agencia" : "personal";
+  for (const x of delMes(m)) if (x.tipo === "gasto" && cuenta(x) && x.ambito === amb && !FIJAS.has(x.categoria)) cur.set(x.categoria, (cur.get(x.categoria) || 0) + enUSD(x.monto, x.moneda));
+  for (const pm of prevs) for (const x of delMes(pm)) if (x.tipo === "gasto" && cuenta(x) && x.ambito === amb) avg.set(x.categoria, (avg.get(x.categoria) || 0) + enUSD(x.monto, x.moneda) / Math.max(1, conDatos));
   const vars = [...cur.entries()].sort((a, b) => b[1] - a[1]), out = [];
   for (const [k, v] of vars) { const a = avg.get(k) || 0; if (conDatos && a > 0 && v > a * 1.15 && v - a > 20) out.push(`<li><span>${esc(k)}</span><span class="chip soon">+${esc(usd(v - a))} vs. tu promedio</span></li>`); }
   for (const [k, v] of vars.slice(0, 3)) if (!out.some(o => o.includes(`<span>${esc(k)}</span>`))) out.push(`<li><span>${esc(k)}</span><b class="num">${esc(usd(v))}</b></li>`);
   if (vars.length) out.push(`<li><span class="muted">Bajando un 20 % «${esc(vars[0][0])}» guardás ${esc(usd(vars[0][1] * 0.2 * 12))} al año.</span></li>`);
-  $("ins").innerHTML = out.length ? out.slice(0, 5).join("") : `<li><span class="muted">Cargá Uber, comidas, súper y salidas: acá aparecen las categorías que más crecen.</span></li>`;
+  $("ins").innerHTML = out.length ? out.slice(0, 5).join("") : `<li><span class="muted">${st.libro === "agencia" ? "Cargá los gastos de la agencia" : "Cargá Uber, comidas, súper y salidas"}: acá aparecen las categorías que más crecen.</span></li>`;
 }
 function renderUltimos(m) {
-  const xs = delMes(m).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.creado || "").localeCompare(String(a.creado || ""))).slice(0, 6);
+  const xs = delMes(m).filter(enLibro).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.creado || "").localeCompare(String(a.creado || ""))).slice(0, 6);
   $("ultimos").innerHTML = xs.length ? xs.map(x => { const ing = x.tipo === "ingreso";
     return `<li><span class="dot" style="background:${ing ? "rgba(1,181,116,.18);color:#01B574" : "rgba(43,38,32,.1);color:#2B2620"}">${ing ? "+" : "−"}</span>
-      <div style="min-width:0"><b>${esc(x.concepto || x.categoria)}</b><span>${esc(ddmm(x.fecha))} · ${esc(x.categoria)}</span></div><b class="num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</b></li>`; }).join("")
+      <div style="min-width:0"><b>${esc(x.concepto || x.categoria)}</b><span><i class="pt ${x.ambito === "agencia" ? "age" : "per"}" aria-hidden="true"></i>${esc(ddmm(x.fecha))} · ${esc(x.categoria)}</span></div><b class="num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</b></li>`; }).join("")
     : `<li><span></span><span class="muted">Sin movimientos en ${esc(nombreMes(m))}.</span><span></span></li>`;
 }
 function renderMovs() {
   let xs = delMes(st.mes);
-  if (st.filtro !== "todos") xs = xs.filter(x => x.ambito === st.filtro);
+  xs = xs.filter(enLibro);
   if (st.q) { const q = st.q.toLowerCase(); xs = xs.filter(x => `${x.concepto || ""} ${x.categoria || ""}`.toLowerCase().includes(q)); }
   xs.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.creado || "").localeCompare(String(a.creado || "")));
-  const t = totales(st.mes); $("movSub").textContent = `${xs.length} movimientos · entra ${usd(t.ing)} · sale ${usd(t.gas)}`;
+  const t = totales(st.mes), ent = st.libro === "personal" ? t.iP : t.ing;
+  $("movSub").textContent = `${xs.length} movimientos · entra ${usd(ent)} · sale ${usd(t.gas)}${st.libro === "personal" ? " (sin contar lo que te deja la agencia)" : ""}`;
   $("tMovs").innerHTML = xs.length ? xs.map(x => { const ing = x.tipo === "ingreso", crm = x.origen === "crm";
     const enCuotas = x.cuotas > 1 && x.deuda_id && st.deudas.some(d => d.id === x.deuda_id && d.tipo === "cuotas");
     const borrar = crm ? `<span class="chip">CRM</span>` : st.borrando === "m:" + x.id
       ? (enCuotas ? `<button class="btn sm danger" data-del-d="${esc(x.deuda_id)}">Borrar las ${esc(x.cuotas)} cuotas</button>` : `<button class="btn sm danger" data-del-m="${esc(x.id)}">Borrar</button>`) + ` <button class="btn sm ghost" data-cancel>No</button>`
-      : `<button class="btn sm ghost" data-ask="m:${esc(x.id)}" aria-label="Borrar">×</button>`;
+      : `<button class="btn sm ghost mover" data-mover="${esc(x.id)}" title="Si lo cargaste en el lado equivocado">Pasar a ${x.ambito === "agencia" ? "personal" : "agencia"}</button> <button class="btn sm ghost" data-ask="m:${esc(x.id)}" aria-label="Borrar">×</button>`;
     return `<tr><td class="num">${esc(ddmm(x.fecha))}</td><td>${esc(x.concepto || x.categoria)}<div class="soft" style="font-size:.74rem">${esc(metodoTxt(x) || (crm ? "Facturas cobradas" : ""))}</div></td>
       <td><span class="chip ${esc(x.ambito)}">${esc(x.categoria)}</span>${NO_SUMA.has(x.categoria) ? ` <span class="chip">no suma</span>` : ""}</td>
       <td class="n num">${esc(fmtNum(Number(x.monto), x.moneda))}</td><td class="n num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</td><td style="white-space:nowrap">${borrar}</td></tr>`; }).join("")
-    : `<tr><td colspan="6"><div class="empty">Sin movimientos en ${esc(nombreMes(st.mes))}${st.filtro !== "todos" || st.q ? " con este filtro" : ""}. Tocá «+» para cargar.</div></td></tr>`;
+    : `<tr><td colspan="6"><div class="empty">Sin movimientos en ${esc(nombreMes(st.mes))}${st.libro !== "todo" ? (st.libro === "agencia" ? " de la agencia" : " personales") : ""}${st.q ? " con esta búsqueda" : ""}. Tocá «+» para cargar.</div></td></tr>`;
 }
 function renderCfg() {
   const c = st.cfg;
@@ -405,16 +434,19 @@ function chips() {
   $("mChips").innerHTML = lista.map(c => `<button type="button" data-cat="${esc(c)}" aria-pressed="${c === st.cat}">${esc(c)}</button>`).join("");
   $("tGas").setAttribute("aria-pressed", st.tipo === "gasto"); $("tIng").setAttribute("aria-pressed", st.tipo === "ingreso");
   $("aPer").setAttribute("aria-pressed", st.ambito === "personal"); $("aAge").setAttribute("aria-pressed", st.ambito === "agencia");
-  $("mGuardar").textContent = st.tipo === "gasto" ? "Guardar gasto" : "Guardar ingreso"; hint();
+  hint();
 }
 function hint() {
   const v = $("mMonto").value, conCuotas = st.tipo === "gasto" && !!tarjetaSel(), k = conCuotas ? Number($("mCuotas").value) || 1 : 1;
   $("mCuotasRow").hidden = !conCuotas;
   $("mCuotasHint").textContent = k > 1 ? (v ? `${k} cuotas de ${usd(enUSD(v / k, $("mMoneda").value))}, una por mes` : "Poné arriba el total de la compra") : "";
   $("mHint").textContent = v ? `= ${usd(enUSD(v, $("mMoneda").value))}${k > 1 ? " en total" : ""}${NO_SUMA.has(st.cat) ? " · el resumen de la tarjeta no suma (sus consumos ya están cargados)" : ""}` : (k > 1 ? "Monto total de la compra" : "Se pasa solo a dólares");
-  $("mGuardar").textContent = st.tipo === "ingreso" ? "Guardar ingreso" : k > 1 ? `Guardar compra en ${k} cuotas` : "Guardar gasto";
+  const de = st.ambito === "agencia" ? "de la agencia" : "personal";
+  $("mGuardar").textContent = st.tipo === "ingreso" ? `Guardar ingreso ${de}` : k > 1 ? `Guardar compra ${de} en ${k} cuotas` : `Guardar gasto ${de}`;
+  $("sheetT").textContent = `${st.tipo === "ingreso" ? "Nuevo ingreso" : "Nuevo gasto"} ${de}`;
+  $("sheet").dataset.amb = st.ambito;
 }
-function abrir() { $("mFecha").value = hoy(); $("mCuotas").value = "1"; chips(); $("sheet").hidden = false; $("sheetBg").hidden = false; setTimeout(() => $("mMonto").focus(), 50); }
+function abrir() { $("mFecha").value = hoy(); $("mCuotas").value = "1"; st.ambito = st.libro === "agencia" ? "agencia" : "personal"; chips(); $("sheet").hidden = false; $("sheetBg").hidden = false; setTimeout(() => $("mMonto").focus(), 50); }
 function cerrar() { $("sheet").hidden = true; $("sheetBg").hidden = true; }
 $("tGas").onclick = () => { st.tipo = "gasto"; chips(); }; $("tIng").onclick = () => { st.tipo = "ingreso"; chips(); };
 $("aPer").onclick = () => { st.ambito = "personal"; chips(); }; $("aAge").onclick = () => { st.ambito = "agencia"; chips(); };
@@ -513,7 +545,21 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if ("add" in b.dataset) { abrir(); return; }
   if (b.dataset.go) { st.vista = b.dataset.go; st.borrando = null; st.pagando = null; render(); window.scrollTo({ top: 0 }); return; }
-  if (b.dataset.f) { st.filtro = b.dataset.f; document.querySelectorAll("#segAmb button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderMovs(); return; }
+  if (b.dataset.libro) {
+    st.libro = b.dataset.libro; ls.set("mf-libro", st.libro); st.borrando = null;
+    if (st.libro !== "todo") { $("fAmbito").value = st.libro; refrescarFCat(); $("dAmb").value = st.libro; }
+    render(); return;
+  }
+  if (b.dataset.mover) {
+    if (st.demo) { toast("Modo ejemplo: no se guarda nada."); return; }
+    const x = st.movs.find(y => y.id === b.dataset.mover); if (!x) return;
+    const nuevo = x.ambito === "agencia" ? "personal" : "agencia"; b.disabled = true;
+    // si es una cuota o un pago de deuda, se pasa la deuda entera con todas sus cuotas
+    const q = sb.from("fin_movimientos").update({ ambito: nuevo });
+    const { error } = await (x.deuda_id ? q.eq("deuda_id", x.deuda_id) : q.eq("id", x.id));
+    if (!error && x.deuda_id) await sb.from("fin_deudas").update({ ambito: nuevo }).eq("id", x.deuda_id);
+    toast(error ? "No se pudo cambiar." : `${x.concepto || x.categoria}: ahora es ${nuevo === "agencia" ? "de la agencia" : "personal"}`); await cargar(); return;
+  }
   if (b.dataset.ask) { st.borrando = b.dataset.ask; render(); return; }
   if ("cancel" in b.dataset) { st.borrando = null; st.pagando = null; render(); return; }
   if (b.dataset.pagodeu) { st.pagando = b.dataset.pagodeu; render(); return; }
