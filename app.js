@@ -163,7 +163,7 @@ function renderResumen() {
   $("kFij").innerHTML = esc(usd(fm.reduce((s, f) => s + enUSD(f.monto, f.moneda), 0))) + (fm.length ? `<small class="muted">${pend} sin pagar</small>` : "");
   $("fijMeter").style.width = fm.length ? `${Math.round((fm.length - pend) / fm.length * 100)}%` : "0%";
   const ult = [-5, -4, -3, -2, -1, 0].map(k => totales(sumaMes(m, k)));
-  spark("spIng", ult.map(t => t.ing), "#01B574"); spark("spGas", ult.map(t => t.gas), "#F0475B"); spark("spAho", ult.map(t => t.ing - t.gas), "#0075FF");
+  spark("spIng", ult.map(t => t.ing), "#01B574"); spark("spGas", ult.map(t => t.gas), "#F0475B"); spark("spAho", ult.map(t => t.ing - t.gas), "#C9973B");
 
   // meta (solo cuenta lo que ya pasó: las cuotas futuras no restan todavía)
   const c = st.cfg, ini = c.inicio || CFG_DEF.inicio, fmeta = c.fecha_meta || CFG_DEF.fecha_meta, meta = Number(c.meta) || 0, h = hoy();
@@ -226,18 +226,18 @@ function renderEvo(m) {
   const x = (i) => l + (W - l - r) * i / 11, y = (v) => top + (H - top - b) * (1 - v / max);
   const pi = ts.map((t, i) => [x(i), y(t.ing)]), pg = ts.map((t, i) => [x(i), y(t.gas)]);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ingresos y gastos de los últimos 12 meses"><defs>
-    <linearGradient id="aI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0075FF" stop-opacity=".75"/><stop offset="1" stop-color="#0075FF" stop-opacity="0"/></linearGradient>
-    <linearGradient id="aG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2CD9FF" stop-opacity=".55"/><stop offset="1" stop-color="#2CD9FF" stop-opacity="0"/></linearGradient></defs>`;
+    <linearGradient id="aI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4AF6A" stop-opacity=".7"/><stop offset="1" stop-color="#D4AF6A" stop-opacity="0"/></linearGradient>
+    <linearGradient id="aG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A332B" stop-opacity=".28"/><stop offset="1" stop-color="#3A332B" stop-opacity="0"/></linearGradient></defs>`;
   for (let k = 0; k <= 4; k++) { const v = max * k / 4, yy = y(v); s += `<line x1="${l}" x2="${W - r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="rgba(20,26,60,.08)" stroke-dasharray="4 4"/><text x="${l - 8}" y="${(yy + 4).toFixed(1)}" font-size="11" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
   const base = y(0);
-  s += `<path d="${curva(pi)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aI)"/><path d="${curva(pi)}" fill="none" stroke="#0075FF" stroke-width="3"/>`;
-  s += `<path d="${curva(pg)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aG)"/><path d="${curva(pg)}" fill="none" stroke="#2CD9FF" stroke-width="3"/>`;
+  s += `<path d="${curva(pi)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aI)"/><path d="${curva(pi)}" fill="none" stroke="#B8862F" stroke-width="3"/>`;
+  s += `<path d="${curva(pg)} L${x(11)},${base} L${x(0)},${base} Z" fill="url(#aG)"/><path d="${curva(pg)}" fill="none" stroke="#2B2620" stroke-width="2.5"/>`;
   meses.forEach((mm, i) => { s += `<text x="${x(i).toFixed(1)}" y="${H - 8}" font-size="11" text-anchor="middle">${esc(MESES[Number(mm.slice(5)) - 1].slice(0, 3))}</text>`;
     s += `<circle cx="${x(i).toFixed(1)}" cy="${y(ts[i].ing).toFixed(1)}" r="9" fill="transparent"><title>${esc(nombreMes(mm))}: ingresos ${esc(usd(ts[i].ing))} · gastos ${esc(usd(ts[i].gas))}</title></circle>`; });
-  s += `<circle cx="${x(11)}" cy="${y(ts[11].ing).toFixed(1)}" r="4.5" fill="#fff" stroke="#0075FF" stroke-width="2.5"/>`;
+  s += `<circle cx="${x(11)}" cy="${y(ts[11].ing).toFixed(1)}" r="4.5" fill="#fff" stroke="#B8862F" stroke-width="2.5"/>`;
   $("gEvo").innerHTML = s + "</svg>";
   const tot = ts.reduce((a, t) => ({ i: a.i + t.ing, g: a.g + t.gas }), { i: 0, g: 0 });
-  $("evoSub").innerHTML = `<span style="color:#0075FF">●</span> Ingresos ${esc(usdC(tot.i))} · <span style="color:#2CD9FF">●</span> Gastos ${esc(usdC(tot.g))} en 12 meses`;
+  $("evoSub").innerHTML = `<span style="color:#C9973B">●</span> Ingresos ${esc(usdC(tot.i))} · <span style="color:#2B2620">●</span> Gastos ${esc(usdC(tot.g))} en 12 meses`;
 }
 function renderDia(m) {
   const n = diasMes(m), vals = Array(n).fill(0);
@@ -248,7 +248,7 @@ function renderDia(m) {
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gasto por día">`;
   for (let k = 0; k <= 3; k++) { const v = max * k / 3, yy = top + (H - top - b) * (1 - k / 3); s += `<text x="${l - 6}" y="${(yy + 4).toFixed(1)}" font-size="10" text-anchor="end">${esc(fmt0.format(Math.round(v)))}</text>`; }
   vals.forEach((v, i) => { const h = (H - top - b) * v / max, xx = l + i * bw + bw / 2 - 2.5;
-    s += `<rect x="${xx.toFixed(1)}" y="${(H - b - Math.max(2, h)).toFixed(1)}" width="5" height="${Math.max(2, h).toFixed(1)}" rx="2.5" fill="${v ? "#fff" : "rgba(255,255,255,.12)"}"><title>${i + 1}: ${esc(usd(v))}</title></rect>`; });
+    s += `<rect x="${xx.toFixed(1)}" y="${(H - b - Math.max(2, h)).toFixed(1)}" width="5" height="${Math.max(2, h).toFixed(1)}" rx="2.5" fill="${v ? "#E9C97F" : "rgba(240,215,155,.14)"}"><title>${i + 1}: ${esc(usd(v))}</title></rect>`; });
   $("gDia").innerHTML = s + "</svg>";
 }
 function renderStats(m) {
@@ -357,7 +357,7 @@ function renderIns(m) {
 function renderUltimos(m) {
   const xs = delMes(m).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.creado || "").localeCompare(String(a.creado || ""))).slice(0, 6);
   $("ultimos").innerHTML = xs.length ? xs.map(x => { const ing = x.tipo === "ingreso";
-    return `<li><span class="dot" style="background:${ing ? "rgba(1,181,116,.18);color:#01B574" : "rgba(0,117,255,.18);color:#4DA3FF"}">${ing ? "+" : "−"}</span>
+    return `<li><span class="dot" style="background:${ing ? "rgba(1,181,116,.18);color:#01B574" : "rgba(43,38,32,.1);color:#2B2620"}">${ing ? "+" : "−"}</span>
       <div style="min-width:0"><b>${esc(x.concepto || x.categoria)}</b><span>${esc(ddmm(x.fecha))} · ${esc(x.categoria)}</span></div><b class="num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</b></li>`; }).join("")
     : `<li><span></span><span class="muted">Sin movimientos en ${esc(nombreMes(m))}.</span><span></span></li>`;
 }
