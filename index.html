@@ -24,7 +24,7 @@
   --edge:#ECE2D0; --ink:#141A3C; --muted:#5E6382; --soft:#8B8EA6;
   --navy:linear-gradient(165deg,#1636B8 0%, #0D1E78 48%, #0A1352 100%); --shadow:0 10px 30px rgba(70,52,20,.07);
   --blue:#0075FF; --blue-2:#2CD9FF; --green:#01B574; --red:#F0475B; --amber:#FFB547; --violet:#8B5CF6;
-  --inset:#060B28; --track:#EFE7D8;
+  --inset:#060B28; --track:#EFE7D8; --gold:#C8902E; --rose:#F6DADC;
   --f:"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --r:20px; color-scheme:light;
 }
@@ -105,14 +105,43 @@ h2{font-size:1.02rem}
 .hello p{color:rgba(255,255,255,.85);max-width:26ch;margin:0;position:relative;text-shadow:0 1px 8px rgba(5,10,60,.6)}
 .link{background:none;border:0;padding:0;color:var(--ink);font-weight:600;font-size:.82rem;display:inline-flex;gap:6px;align-items:center;position:relative}
 
-/* medidores */
-.gauge{display:grid;place-items:center;position:relative;margin-top:4px}
-.gauge svg{width:100%;max-width:220px;height:auto;display:block}
-.gauge .center{position:absolute;bottom:0;left:50%;transform:translateX(-50%);background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.3);box-shadow:0 10px 24px -14px rgba(80,60,25,.35);border-radius:16px;padding:8px 14px;text-align:center;width:min(150px,64%)}
-.gauge .center b{font-size:1.45rem;display:block;line-height:1.1}
-.gauge .center span{font-size:.74rem;color:var(--muted)}
-.gauge .ends{position:absolute;bottom:-18px;left:0;right:0;display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);padding:0 6%}
-.gauge{padding-bottom:22px}
+/* barras de avance: ahorro en dorado; deudas en verde (pagado) sobre rosado (lo que falta) */
+.hbar{position:relative;height:14px;border-radius:999px;background:#EFE5D3;box-shadow:inset 0 1px 2px rgba(80,60,25,.16)}
+.hbar > i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,.45);transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.hbar.gold{height:18px;margin:16px 0 6px}
+.hbar.gold > i{background:linear-gradient(90deg,#B07A1F 0%,#D9A441 55%,#F1CF7E 100%)}
+.hbar .hoy{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1.5px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px #FFFDF8}
+.hbar-legend{display:flex;justify-content:space-between;font-size:.72rem;color:var(--soft)}
+.meta-v{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px}
+.meta-v b{font-size:1.85rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.meta-v span{color:var(--muted);font-size:.86rem}
+.meta-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.meta-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.8rem;color:var(--muted);padding:8px 12px;border-radius:12px;background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.25)}
+.meta-list b{color:var(--ink);font-size:.88rem}
+.chip.gold{color:#8A5A00;border-color:rgba(200,144,46,.45);background:#FFF5E0;font-weight:700}
+.deu-wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
+.deu-sum{display:grid;gap:12px}
+.deu-sum .big{border-radius:18px;padding:16px;color:#fff;background:var(--navy);box-shadow:0 14px 30px -16px rgba(13,30,120,.6)}
+.deu-sum .big span{display:block;font-size:.76rem;color:rgba(255,255,255,.75)}
+.deu-sum .big b{display:block;font-size:1.7rem;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.deu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.deu{display:grid;gap:9px;align-content:start;background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.3);border-radius:18px;padding:14px 16px;box-shadow:inset 0 1px 0 #fff, 0 10px 22px -16px rgba(80,60,25,.4)}
+.deu-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.deu-h b{display:block;font-size:.95rem;overflow-wrap:anywhere}
+.deu-h small{display:block;font-size:.74rem;color:var(--muted);margin-top:1px}
+.deu .hbar{height:12px;background:var(--rose)}
+.deu .hbar > i{background:linear-gradient(90deg,#05CD99,#01B574)}
+.deu-f{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted)}
+.deu-f b{color:var(--ink)} .deu-f .q b{color:#C8253A}
+.deu-x{font-size:.74rem;color:var(--soft)}
+.deu-a{display:flex;gap:8px;align-items:center;justify-content:space-between;padding-top:2px}
+.deu-a > .deu-x,.deu-a > form.pago{flex:1 1 auto;min-width:0} .deu-a > :only-child{margin-left:auto}
+form.pago{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;width:100%}
+form.pago input{width:100%;padding:7px 10px;border-radius:10px}
+.tarjetas{display:flex;flex-wrap:wrap;gap:8px}
+.tarjetas span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--edge);background:#fff;border-radius:999px;padding:6px 6px 6px 12px;font-size:.82rem;font-weight:600}
+.tarjetas button{border:0;background:#F4EDE0;border-radius:999px;width:24px;height:24px;line-height:1;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.hbar > i{transition:none}}
 .track-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center}
 .mini{display:grid;gap:12px}
 .mini div{background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.3);border-radius:18px;padding:12px 16px;box-shadow:inset 0 1px 0 #fff, 0 8px 18px -14px rgba(80,60,25,.35)}
@@ -198,6 +227,7 @@ input::placeholder{color:#A9A6B8}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:#141A3C;border:1px solid var(--edge);color:#fff;padding:10px 16px;border-radius:14px;font-size:.86rem;z-index:60;max-width:calc(100% - 32px)}
 @media (max-width:1180px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.row-a{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.row-a .hello{grid-column:1/-1}}
 @media (max-width:900px){
+  .deu-wrap{grid-template-columns:minmax(0,1fr)} .deu-sum .mini{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .app{grid-template-columns:minmax(0,1fr)}
   .side{display:none}
   .main{padding:16px max(16px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
@@ -267,16 +297,15 @@ input::placeholder{color:#A9A6B8}
           <button class="link" data-add>Cargar un gasto <span aria-hidden="true">→</span></button>
         </div>
         <div class="card">
-          <div class="card-head"><div><h2>Meta de ahorro</h2><div class="sub" id="metaSub">—</div></div></div>
-          <div class="gauge">
-            <svg viewBox="0 0 220 130" aria-hidden="true">
-              <defs><linearGradient id="gArc" x1="0" x2="1"><stop offset="0" stop-color="#0075FF"/><stop offset="1" stop-color="#2CD9FF"/></linearGradient></defs>
-              <path d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="#EFE7D8" stroke-width="16" stroke-linecap="round"/>
-              <path id="arc" d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="url(#gArc)" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"/>
-            </svg>
-            <div class="ends"><span>0 %</span><span>100 %</span></div>
-            <div class="center"><b class="num" id="metaPct">0 %</b><span id="metaCenter">—</span></div>
-          </div>
+          <div class="card-head"><div><h2>Meta de ahorro</h2><div class="sub" id="metaSub">—</div></div><span class="chip gold num" id="metaPct">0 %</span></div>
+          <div class="meta-v"><b class="num" id="metaAcum">—</b><span id="metaDe"></span></div>
+          <div class="hbar gold" role="progressbar" aria-label="Avance de la meta de ahorro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="metaBar"><i id="metaFill" style="width:0%"></i><span class="hoy" id="metaHoy" title="Dónde deberías estar hoy" hidden></span></div>
+          <div class="hbar-legend"><span>US$ 0</span><span id="metaFin">—</span></div>
+          <ul class="meta-list">
+            <li><span>Te falta</span><b class="num" id="metaFalta">—</b></li>
+            <li><span>Por mes hasta la fecha</span><b class="num" id="metaMes">—</b></li>
+            <li><span id="metaRitmoT">Hoy deberías ir por</span><b class="num" id="metaRitmo">—</b></li>
+          </ul>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>Ritmo del mes</h2><div class="sub" id="ritmoSub">—</div></div></div>
@@ -307,6 +336,11 @@ input::placeholder{color:#A9A6B8}
           <div style="margin-top:16px"><h2>Gasto por día</h2><div class="sub" id="diaSub">—</div></div>
           <div class="stats" id="stats"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h2>Créditos y deudas</h2><div class="sub" id="deuSubR">—</div></div><button class="btn sm ghost" data-go="deudas">Ver todas</button></div>
+        <div id="deuR"></div>
       </div>
 
       <div class="row-c">
@@ -360,8 +394,42 @@ input::placeholder{color:#A9A6B8}
             <label>Día de cobro<input id="fDia" type="number" min="1" max="31" value="1" required></label>
             <label id="fMesL" hidden>Mes<select id="fMes"></select></label>
           </div>
-          <label>Cómo se paga<select id="fMetodo"><option>Tarjeta</option><option>Débito</option><option>Domiciliación</option><option>Transferencia</option><option>PayPal</option></select></label>
+          <label>Cómo se paga<select id="fMetodo"></select></label>
           <button class="btn" type="submit">Guardar pago fijo</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- DEUDAS -->
+    <section data-view="deudas" class="grid" hidden>
+      <div class="card">
+        <div class="card-head"><div><h2>Créditos y deudas</h2><div class="sub" id="deuSub">—</div></div></div>
+        <div id="deuV"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>Agregar crédito o deuda</h2><div class="sub">Las compras en cuotas que cargás con «+» aparecen solas acá.</div></div></div>
+        <form id="fDeu" autocomplete="off">
+          <div class="f2">
+            <label>Qué es<select id="dTipo"><option value="prestamo">Préstamo o crédito</option><option value="cuotas">Compra en cuotas con tarjeta</option><option value="persona">Deuda con una persona</option><option value="otro">Otra deuda</option></select></label>
+            <label>Nombre<input id="dNombre" maxlength="60" required placeholder="Ej.: Préstamo del banco, iPhone"></label>
+          </div>
+          <div class="f2">
+            <label id="dAcrL">A quién le debés<input id="dAcr" maxlength="60" placeholder="Banco, persona…"></label>
+            <label id="dTarL" hidden>Tarjeta<select id="dTar"></select></label>
+            <label>De quién<select id="dAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
+          </div>
+          <div class="f3">
+            <label>Total a pagar<input id="dTotal" type="number" inputmode="decimal" step="0.01" min="0" required></label>
+            <label>Moneda<select id="dMon"></select></label>
+            <label>Cuotas en total<input id="dCuotas" type="number" inputmode="numeric" min="1" max="600" placeholder="Sin cuotas"></label>
+          </div>
+          <div class="f3">
+            <label id="dYaL"><span id="dYaT">Ya pagaste (monto)</span><input id="dYa" type="number" inputmode="decimal" min="0" step="any" value="0"></label>
+            <label>Día de pago<input id="dDia" type="number" inputmode="numeric" min="1" max="31"></label>
+            <label id="dCatL" hidden>Categoría<select id="dCat"></select></label>
+          </div>
+          <div class="hint" id="dHint">Si tiene interés, poné el total que vas a pagar (cuota × cantidad).</div>
+          <button class="btn" type="submit">Guardar</button>
         </form>
       </div>
     </section>
@@ -379,6 +447,14 @@ input::placeholder{color:#A9A6B8}
           <div class="sub" style="margin-top:6px">Cuántos USD vale 1 unidad de cada moneda</div>
           <div class="f3" id="cTasas"></div>
           <button class="btn" type="submit">Guardar ajustes</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>Tus tarjetas</h2><div class="sub">Aparecen en «Cómo pagaste» al cargar un gasto.</div></div></div>
+        <div class="tarjetas" id="tarList"></div>
+        <form id="fTar" autocomplete="off" style="grid-template-columns:minmax(0,1fr) auto;margin-top:14px">
+          <input id="tarNueva" maxlength="40" placeholder="Ej.: Amex, Visa de la agencia" aria-label="Nombre de la tarjeta nueva">
+          <button class="btn" type="submit">Agregar</button>
         </form>
       </div>
       <div class="card"><h2>Ingresos de la agencia</h2><p class="muted" style="margin:6px 0 0">Los cobros de clientes se leen solos del CRM (facturas pagadas de cada mes), no hace falta cargarlos. Tu trabajo personal y otros ingresos sí: con el botón «+» → Ingreso.</p>
@@ -406,7 +482,11 @@ input::placeholder{color:#A9A6B8}
     <label>Concepto (opcional)<input id="mConcepto" maxlength="80" placeholder="Ej.: Uber al aeropuerto"></label>
     <div class="f2">
       <label>Fecha<input id="mFecha" type="date" required></label>
-      <label>Cómo pagaste<select id="mMetodo"><option>Tarjeta</option><option>Débito</option><option>Efectivo</option><option>Transferencia</option><option>Bizum</option><option>PayPal</option></select></label>
+      <label>Cómo pagaste<select id="mMetodo"></select></label>
+    </div>
+    <div class="f2" id="mCuotasRow" hidden>
+      <label>En cuántas cuotas<select id="mCuotas"></select></label>
+      <div class="hint" id="mCuotasHint" style="align-self:end;padding-bottom:12px"></div>
     </div>
     <button class="btn" type="submit" id="mGuardar">Guardar gasto</button>
   </form>
