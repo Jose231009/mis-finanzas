@@ -40,9 +40,9 @@ const svgIco = (k, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 2
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
-// Montos en pantalla: lo personal en pesos, la agencia y «Todo» en dólares. La meta de ahorro siempre en dólares.
+// Montos en pantalla: siempre en dólares; cada pago o deuda conserva su moneda original en las listas.
 const SIMB = { USD: "US$", ARS: "$", EUR: "€", GBP: "£" };
-const disp = () => (typeof st !== "undefined" && st.libro === "personal") ? "ARS" : "USD";
+const disp = () => "USD";   // José 25/11: todo en dólares en las tres vistas (los montos se cargan en su moneda y se pasan solos)
 const tasaDe = (m) => Number(((typeof st !== "undefined" && st.cfg.tasas) || {})[m] ?? CFG_DEF.tasas[m] ?? 1);
 const fmtMon = (n, m) => m === "EUR" ? `${fmt0.format(Math.round(n || 0))} €` : `${SIMB[m] || m} ${fmt0.format(Math.round(n || 0))}`;
 const aDisp = (nUSD) => (nUSD || 0) / tasaDe(disp());                 // dólares → moneda en pantalla
@@ -152,6 +152,25 @@ function totales(m, L = st.libro) {
   const gas = L === "agencia" ? gA : L === "personal" ? gP : gP + gA;
   return { ing, gas, gP, gA, iP, iA, ganancia };
 }
+// Total previsto del mes: lo real + lo que falta cobrar (cobros fijos, facturas de clientes) y pagar (pagos fijos).
+// Las tarjetas: el resumen estima lo que se gasta con tarjeta; si cargaste menos compras con tarjeta, se completa con la diferencia.
+function previsto(m, L = st.libro) {
+  const t = totales(m, L), act = mesDe(hoy());
+  if (m < act) return { ...t, ingP: t.ing, gasP: t.gas, faltaIng: 0, faltaGas: 0 };
+  const fijPend = (cobro, amb) => st.fijos.filter(f => f.activo !== false && esCobro(f) === cobro && f.ambito === amb && fijoEnMes(f, m) && !pagadoEnMes(f, m) && (cobro || !NO_SUMA.has(f.categoria)))
+    .reduce((a, f) => a + enUSD(f.monto, f.moneda), 0);
+  const tarj = (amb) => {
+    const est = st.fijos.filter(f => f.activo !== false && !esCobro(f) && f.ambito === amb && f.categoria === "Pago de tarjeta" && fijoEnMes(f, m)).reduce((a, f) => a + enUSD(f.monto, f.moneda), 0);
+    const reg = delMes(m).filter(x => x.tipo === "gasto" && cuenta(x) && x.ambito === amb && (x.tarjeta || /^Tarjeta/.test(x.metodo || ""))).reduce((a, x) => a + enUSD(x.monto, x.moneda), 0);
+    return Math.max(0, est - reg);
+  };
+  const crmPend = m === act ? st.factur.filter(x => x.mes === m).reduce((a, x) => a + Math.max(0, enUSD(Number(x.facturado) - Number(x.cobrado), x.moneda)), 0) : estimadoCRM();
+  const P = { ing: fijPend(true, "personal"), gas: fijPend(false, "personal") + tarj("personal") };
+  const A = { ing: fijPend(true, "agencia") + crmPend, gas: fijPend(false, "agencia") + tarj("agencia") };
+  const faltaIng = L === "agencia" ? A.ing : L === "personal" ? P.ing + (A.ing - A.gas) : P.ing + A.ing;
+  const faltaGas = L === "agencia" ? A.gas : L === "personal" ? P.gas : P.gas + A.gas;
+  return { ...t, ingP: t.ing + faltaIng, gasP: t.gas + faltaGas, faltaIng, faltaGas };
+}
 function proximoPago(f, ref) {
   const [y, mo, d] = ref.split("-").map(Number), dia = Math.max(1, Math.min(31, Number(f.dia) || 1));
   const mk = (yy, mm) => new Date(yy, mm - 1, Math.min(dia, new Date(yy, mm, 0).getDate()));
@@ -182,10 +201,14 @@ function renderResumen() {
     agencia: ["Cobros de la agencia", "Gastos de la agencia", "Ganancia de la agencia", "Pagos fijos de la agencia"] }[L];
   ["kIngT", "kGasT", "kAhoT", "kFijT"].forEach((id, i) => ($(id).textContent = ET[i]));
   $("kIngT").title = L === "personal" ? `Incluye ${usd(t.ganancia)} que te dejó la agencia (cobros menos gastos de la agencia)` : "";
-  $("kIng").innerHTML = esc(usd(t.ing)) + delta(t.ing, p.ing);
-  $("kGas").innerHTML = esc(usd(t.gas)) + deltaGasto(t.gas, p.gas);
-  const aho = t.ing - t.gas;
-  $("kAho").innerHTML = `<span class="${aho >= 0 ? "" : "neg"}">${esc(usd(aho))}</span>`;
+  const pv = previsto(m), pp = previsto(sumaMes(m, -1));
+  $("kIng").innerHTML = esc(usd(pv.ingP)) + delta(pv.ingP, pp.ingP);
+  $("kGas").innerHTML = esc(usd(pv.gasP)) + deltaGasto(pv.gasP, pp.gasP);
+  $("kIngS").textContent = pv.faltaIng > 0.5 ? `cobrado ${usd(t.ing)} · falta ${usd(pv.faltaIng)}` : pv.faltaIng < -0.5 ? `la agencia todavía tiene pagos pendientes` : m >= actual ? "todo cobrado" : "";
+  $("kGasS").textContent = pv.faltaGas > 0.5 ? `pagado ${usd(t.gas)} · falta ${usd(pv.faltaGas)}` : m >= actual ? "todo pagado" : "";
+  const aho = t.ing - t.gas, ahoP = pv.ingP - pv.gasP;
+  $("kAho").innerHTML = `<span class="${ahoP >= 0 ? "" : "neg"}">${esc(usd(ahoP))}</span>`;
+  $("kAhoS").textContent = (pv.faltaIng || pv.faltaGas) ? `hoy, con lo ya movido: ${usd(aho)}` : "";
   const fm = st.fijos.filter(f => f.activo !== false && !esCobro(f) && enLibro(f) && fijoEnMes(f, m));
   const pend = fm.filter(f => !pagadoEnMes(f, m)).length;
   $("kFij").innerHTML = esc(usd(fm.reduce((s, f) => s + enUSD(f.monto, f.moneda), 0))) + (fm.length ? `<small class="muted">${pend} sin pagar</small>` : "");
