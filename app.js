@@ -8,13 +8,13 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession
 
 const CATS = {
   gasto: {
-    personal: ["Comidas y delivery","Uber y transporte","Supermercado","Ocio y salidas","Ropa","Salud","Gimnasio y deporte","Viajes","Educación","Familia","Alquiler","Luz","Gas","Agua","Internet y teléfono","Suscripciones personales","Créditos y préstamos","Pago de tarjeta","Otros"],
+    personal: ["Comidas oficina","Comidas y delivery","Uber y transporte","Supermercado","Lujos de fin de semana","Ocio y salidas","Ropa","Salud","Gimnasio y deporte","Peluquería","Viajes","Educación","Familia","Hogar","Limpieza","Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Suscripciones personales","Créditos y préstamos","Pago de tarjeta","Otros"],
     agencia: ["Apps y suscripciones","Publicidad propia","Equipo y sueldos","Freelancers","Comisiones bancarias","Impuestos","Equipamiento","Créditos y préstamos","Otros agencia"]
   },
-  ingreso: { personal: ["Trabajo personal","Otros ingresos"], agencia: ["Otros ingresos agencia"] }
+  ingreso: { personal: ["Sueldo","Trabajo personal","Otros ingresos"], agencia: ["Otros ingresos agencia"] }
 };
 const NO_SUMA = new Set(["Pago de tarjeta"]);           // el resumen de la tarjeta no suma: sus consumos ya se cargan uno por uno
-const FIJAS = new Set(["Alquiler","Luz","Gas","Agua","Internet y teléfono"]);
+const FIJAS = new Set(["Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Limpieza"]);
 const MONEDAS = ["USD","EUR","ARS","MXN","COP","GBP","CLP"];
 const TARJETAS_DEF = ["Visa", "Mastercard", "Sra. Ana María"];
 const OTROS_PAGOS = ["Débito", "Efectivo", "Transferencia", "Bizum", "PayPal"];
@@ -148,7 +148,8 @@ function proximoPago(f, ref) {
   if (f.frecuencia === "anual") { const mm = Number(f.mes) || 1; let c = mk(y, mm); if (c < base) c = mk(y + 1, mm); return c; }
   let c = mk(y, mo); if (c < base) c = mo === 12 ? mk(y + 1, 1) : mk(y, mo + 1); return c;
 }
-const fijoEnMes = (f, m) => f.frecuencia !== "anual" || Number(f.mes) === Number(m.split("-")[1]);
+const fijoEnMes = (f, m) => !(f.pausa_meses || []).includes(Number(m.split("-")[1])) && (f.frecuencia !== "anual" || Number(f.mes) === Number(m.split("-")[1]));
+const esCobro = (f) => f.tipo === "ingreso";
 const pagadoEnMes = (f, m) => st.movs.some(x => x.fijo_id === f.id && mesDe(x.fecha) === m);
 function delta(a, b) { if (!b) return ""; const p = Math.round((a - b) / b * 100); return `<small class="${p >= 0 ? "pos" : "neg"}">${p >= 0 ? "+" : ""}${p}%</small>`; }
 function deltaGasto(a, b) { if (!b) return ""; const p = Math.round((a - b) / b * 100); return `<small class="${p <= 0 ? "pos" : "neg"}">${p >= 0 ? "+" : ""}${p}%</small>`; }
@@ -174,7 +175,7 @@ function renderResumen() {
   $("kGas").innerHTML = esc(usd(t.gas)) + deltaGasto(t.gas, p.gas);
   const aho = t.ing - t.gas;
   $("kAho").innerHTML = `<span class="${aho >= 0 ? "" : "neg"}">${esc(usd(aho))}</span>`;
-  const fm = st.fijos.filter(f => f.activo !== false && enLibro(f) && fijoEnMes(f, m));
+  const fm = st.fijos.filter(f => f.activo !== false && !esCobro(f) && enLibro(f) && fijoEnMes(f, m));
   const pend = fm.filter(f => !pagadoEnMes(f, m)).length;
   $("kFij").innerHTML = esc(usd(fm.reduce((s, f) => s + enUSD(f.monto, f.moneda), 0))) + (fm.length ? `<small class="muted">${pend} sin pagar</small>` : "");
   $("fijMeter").style.width = fm.length ? `${Math.round((fm.length - pend) / fm.length * 100)}%` : "0%";
@@ -287,19 +288,23 @@ function renderStats(m) {
 }
 function renderFijos(tb, completo) {
   const m = st.mes, ref = m === mesDe(hoy()) ? hoy() : m + "-01", h0 = new Date(hoy() + "T00:00:00");
-  const fs = st.fijos.filter(f => f.activo !== false && enLibro(f)).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => a.p - b.p);
-  if (!completo) $("fijSub").textContent = fs.length ? `${fs.length} pagos · ${usd(fs.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes` : "Todavía no cargaste ninguno";
+  const fs = st.fijos.filter(f => f.activo !== false && enLibro(f)).map(f => ({ f, p: proximoPago(f, ref) })).sort((a, b) => esCobro(b.f) - esCobro(a.f) || a.p - b.p || enUSD(b.f.monto, b.f.moneda) - enUSD(a.f.monto, a.f.moneda));
+  const pagos = fs.filter(x => !esCobro(x.f)), cobros = fs.filter(x => esCobro(x.f));
+  if (!completo) $("fijSub").textContent = fs.length ? `${pagos.length} pagos · ${usd(pagos.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes${cobros.length ? ` · cobrás ${usd(cobros.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))}` : ""}` : "Todavía no cargaste ninguno";
   const cols = completo ? 7 : 5;
   if (!fs.length) { tb.innerHTML = `<tr><td colspan="${cols}"><div class="empty">Cargá alquiler, luz, gas, tarjeta y las apps de la agencia en «Pagos fijos».</div></td></tr>`; return; }
   tb.innerHTML = (completo ? fs : fs.slice(0, 6)).map(({ f, p }) => {
     const dias = Math.round((p - h0) / 864e5), cuando = dias === 0 ? "hoy" : dias > 0 && dias <= 7 ? `en ${dias} d` : "";
-    const est = !fijoEnMes(f, m) ? `<span class="chip">no toca</span>` : pagadoEnMes(f, m) ? `<span class="chip ok">pagado</span>` : `<button class="btn sm" data-pagar="${esc(f.id)}">Pagué</button>`;
+    const cobro = esCobro(f);
+    const est = !fijoEnMes(f, m) ? `<span class="chip">no toca</span>` : pagadoEnMes(f, m) ? `<span class="chip ok">${cobro ? "cobrado" : "pagado"}</span>` : `<button class="btn sm" data-pagar="${esc(f.id)}">${cobro ? "Cobré" : "Pagué"}</button>`;
     const amb = `<span class="chip ${esc(f.ambito)}">${f.ambito === "agencia" ? "Agencia" : "Personal"}</span>`;
     const prox = p.toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
-    const nombre = `<b>${esc(f.nombre)}</b>${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}</div>`;
-    if (!completo) return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num">${esc(usd(enUSD(f.monto, f.moneda)))}</td><td>${est}</td></tr>`;
+    const pausa = (f.pausa_meses || []).length ? ` · sin pago en ${f.pausa_meses.map(k => MESES[k - 1]).join(" y ")}` : "";
+    const nombre = `<b>${esc(f.nombre)}</b>${cobro ? ` <span class="chip ok">cobro</span>` : ""}${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}${esc(pausa)}</div>`;
+    const usdTxt = `${cobro ? "+" : ""}${usd(enUSD(f.monto, f.moneda))}`;
+    if (!completo) return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td></tr>`;
     const borrar = st.borrando === "f:" + f.id ? `<button class="btn sm danger" data-del-f="${esc(f.id)}">Borrar</button> <button class="btn sm ghost" data-cancel>No</button>` : `<button class="btn sm ghost" data-ask="f:${esc(f.id)}" aria-label="Borrar">×</button>`;
-    return `<tr><td>${nombre}</td><td>${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num">${esc(fmtNum(Number(f.monto), f.moneda))}</td><td class="n num">${esc(usd(enUSD(f.monto, f.moneda)))}</td><td>${est}</td><td style="white-space:nowrap">${borrar}</td></tr>`;
+    return `<tr><td>${nombre}</td><td>${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num">${esc(fmtNum(Number(f.monto), f.moneda))}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td><td style="white-space:nowrap">${borrar}</td></tr>`;
   }).join("");
 }
 // ---------- créditos y deudas ----------
@@ -319,7 +324,7 @@ function estadoDeuda(d) {
   return { total, n, pagado, resta, terminada, pct, cuotaMonto, cuotaAct, fin, porMes: terminada ? 0 : (d.tipo === "cuotas" ? (futuros.length ? cuotaMonto : 0) : cuotaMonto) };
 }
 function tileDeuda(d, e, completo) {
-  const quien = d.tipo === "cuotas" ? `Tarjeta ${d.acreedor || ""}`.trim() : (d.acreedor || TIPOS_DEU[d.tipo] || "");
+  const quien = d.tipo === "cuotas" ? ((st.cfg.tarjetas || []).includes(d.acreedor) ? `Tarjeta ${d.acreedor}` : (d.acreedor || "En cuotas")) : (d.acreedor || TIPOS_DEU[d.tipo] || "");
   const det = [quien, e.n ? `${e.n} cuotas de ${usd(enUSD(e.cuotaMonto, d.moneda))}` : "sin cuotas"].filter(Boolean).join(" · ");
   const chip = e.terminada ? `<span class="chip ok">pagada</span>` : e.n ? `<span class="chip num">cuota ${e.cuotaAct} de ${e.n}</span>` : `<span class="chip num">${Math.round(e.pct)} %</span>`;
   const pie = e.terminada ? "Terminaste de pagarla." : [e.fin ? `Terminás en ${mesCorto(e.fin)}` : "Sin fecha de fin", e.porMes ? `${usd(enUSD(e.porMes, d.moneda))} por mes` : ""].filter(Boolean).join(" · ");
@@ -357,7 +362,7 @@ function renderDeudas(el, subEl, completo) {
 }
 function renderDeudasVista() {
   renderDeudas($("deuV"), $("deuSub"), true);
-  if (!$("dMon").options.length) { llenar($("dMon"), MONEDAS, "EUR"); formDeuda(); }
+  if (!$("dMon").options.length) { llenar($("dMon"), MONEDAS, "ARS"); formDeuda(); }
   llenar($("dTar"), st.cfg.tarjetas || TARJETAS_DEF, $("dTar").value);
 }
 function formDeuda() {
@@ -507,7 +512,7 @@ function renderMovs() {
 }
 function renderCfg() {
   const c = st.cfg;
-  if (!$("tMon").options.length) { llenar($("tMon"), MONEDAS, "EUR"); if (st.libro === "agencia") $("tAmb").value = "agencia"; formTope(true); }
+  if (!$("tMon").options.length) { llenar($("tMon"), MONEDAS, "ARS"); if (st.libro === "agencia") $("tAmb").value = "agencia"; formTope(true); }
   renderTopesLista();
   $("tarList").innerHTML = (c.tarjetas || []).map(t => `<span>${esc(t)}<button type="button" data-tar-del="${esc(t)}" aria-label="Quitar ${esc(t)}">×</button></span>`).join("") || `<span class="muted">Sin tarjetas cargadas</span>`; $("cMeta").value = c.meta ?? ""; $("cFecha").value = c.fecha_meta || ""; $("cInicio").value = c.inicio || "";
   $("cTasas").innerHTML = MONEDAS.filter(m => m !== "USD").map(m => `<label>1 ${esc(m)} =<input id="tasa_${esc(m)}" type="number" step="any" min="0" value="${esc((c.tasas || {})[m] ?? "")}"></label>`).join("");
@@ -525,10 +530,10 @@ function metodos() {
 }
 $("mCuotas").innerHTML = CUOTAS_OPC.map(k => `<option value="${k}">${k === 1 ? "1 pago (sin cuotas)" : k + " cuotas"}</option>`).join("");
 const tarjetaSel = () => { const v = $("mMetodo").value || ""; return v.startsWith("tar:") ? v.slice(4) : null; };
-llenar($("mMoneda"), MONEDAS, "EUR"); llenar($("fMoneda"), MONEDAS, "EUR");
+llenar($("mMoneda"), MONEDAS, "ARS"); llenar($("fMoneda"), MONEDAS, "ARS");
 $("fMes").innerHTML = MESES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
-const refrescarFCat = () => llenar($("fCat"), CATS.gasto[$("fAmbito").value], $("fCat").value); refrescarFCat();
-$("fAmbito").onchange = refrescarFCat; $("fFrec").onchange = () => ($("fMesL").hidden = $("fFrec").value !== "anual");
+const refrescarFCat = () => llenar($("fCat"), CATS[$("fTipo").value === "ingreso" ? "ingreso" : "gasto"][$("fAmbito").value], $("fCat").value); refrescarFCat();
+$("fAmbito").onchange = refrescarFCat; $("fTipo").onchange = refrescarFCat; $("fFrec").onchange = () => ($("fMesL").hidden = $("fFrec").value !== "anual");
 
 function chips() {
   const lista = CATS[st.tipo][st.ambito]; if (!lista.includes(st.cat)) st.cat = lista[0];
@@ -547,10 +552,12 @@ function hint() {
   $("sheetT").textContent = `${st.tipo === "ingreso" ? "Nuevo ingreso" : "Nuevo gasto"} ${de}`;
   $("sheet").dataset.amb = st.ambito;
 }
-function abrir() { $("mFecha").value = hoy(); $("mCuotas").value = "1"; st.ambito = st.libro === "agencia" ? "agencia" : "personal"; chips(); $("sheet").hidden = false; $("sheetBg").hidden = false; setTimeout(() => $("mMonto").focus(), 50); }
+const monedaDe = (amb) => ls.get("mf-moneda-" + amb) || (amb === "agencia" ? "USD" : "ARS");
+function abrir() { $("mFecha").value = hoy(); $("mCuotas").value = "1"; st.ambito = st.libro === "agencia" ? "agencia" : "personal"; $("mMoneda").value = monedaDe(st.ambito); chips(); $("sheet").hidden = false; $("sheetBg").hidden = false; setTimeout(() => $("mMonto").focus(), 50); }
 function cerrar() { $("sheet").hidden = true; $("sheetBg").hidden = true; }
 $("tGas").onclick = () => { st.tipo = "gasto"; chips(); }; $("tIng").onclick = () => { st.tipo = "ingreso"; chips(); };
-$("aPer").onclick = () => { st.ambito = "personal"; chips(); }; $("aAge").onclick = () => { st.ambito = "agencia"; chips(); };
+$("aPer").onclick = () => { st.ambito = "personal"; $("mMoneda").value = monedaDe("personal"); chips(); }; $("aAge").onclick = () => { st.ambito = "agencia"; $("mMoneda").value = monedaDe("agencia"); chips(); };
+$("mMoneda").addEventListener("change", () => ls.set("mf-moneda-" + st.ambito, $("mMoneda").value));
 $("mChips").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (b) { st.cat = b.dataset.cat; chips(); } });
 ["mMonto", "mMoneda", "mMetodo", "mCuotas"].forEach(id => $(id).addEventListener("input", hint));
 $("mMetodo").addEventListener("change", () => ls.set("mf-metodo", $("mMetodo").value));
@@ -585,11 +592,11 @@ $("fMov").addEventListener("submit", async (e) => {
 });
 $("fFijo").addEventListener("submit", async (e) => {
   e.preventDefault(); const monto = Number($("fMonto").value); if (!(monto > 0)) { toast("Poné un monto mayor que cero."); return; }
-  const row = { nombre: $("fNombre").value.trim(), ambito: $("fAmbito").value, categoria: $("fCat").value, monto, moneda: $("fMoneda").value, frecuencia: $("fFrec").value,
+  const row = { nombre: $("fNombre").value.trim(), tipo: $("fTipo").value, ambito: $("fAmbito").value, categoria: $("fCat").value, monto, moneda: $("fMoneda").value, frecuencia: $("fFrec").value,
     dia: Math.max(1, Math.min(31, Number($("fDia").value) || 1)), mes: $("fFrec").value === "anual" ? Number($("fMes").value) : null, metodo: $("fMetodo").value };
   const { error } = await sb.from("fin_fijos").insert(row);
   if (error) { toast("No se pudo guardar el pago fijo."); return; }
-  e.target.reset(); refrescarFCat(); $("fMesL").hidden = true; toast(`Pago fijo guardado: ${row.nombre}`); await cargar();
+  e.target.reset(); refrescarFCat(); $("fMesL").hidden = true; toast(`${row.tipo === "ingreso" ? "Cobro" : "Pago"} fijo guardado: ${row.nombre}`); await cargar();
 });
 $("fDeu").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -689,8 +696,8 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.pagar) {
     const f = st.fijos.find(x => x.id === b.dataset.pagar); if (!f || pagadoEnMes(f, st.mes)) return; b.disabled = true;
     const fecha = st.mes === mesDe(hoy()) ? hoy() : `${st.mes}-${String(Math.min(Number(f.dia) || 1, diasMes(st.mes))).padStart(2, "0")}`;
-    const { error } = await sb.from("fin_movimientos").insert({ tipo: "gasto", ambito: f.ambito, categoria: f.categoria, concepto: f.nombre, monto: Number(f.monto), moneda: f.moneda, fecha, metodo: f.metodo, origen: "fijo", fijo_id: f.id });
-    toast(error ? "No se pudo marcar." : `${f.nombre} marcado como pagado`); await cargar();
+    const { error } = await sb.from("fin_movimientos").insert({ tipo: esCobro(f) ? "ingreso" : "gasto", ambito: f.ambito, categoria: f.categoria, concepto: f.nombre, monto: Number(f.monto), moneda: f.moneda, fecha, metodo: f.metodo, origen: "fijo", fijo_id: f.id });
+    toast(error ? "No se pudo marcar." : `${f.nombre} marcado como ${esCobro(f) ? "cobrado" : "pagado"}`); await cargar();
   }
 });
 $("busca").addEventListener("input", e => { st.q = e.target.value.trim(); renderMovs(); });

@@ -421,16 +421,17 @@ input::placeholder{color:#A9A6B8}
     <!-- PAGOS FIJOS -->
     <section data-view="fijos" class="grid" hidden>
       <div class="card">
-        <div class="card-head"><div><h2>Pagos fijos y suscripciones</h2><div class="sub">Alquiler, luz, gas, tarjeta, apps de la agencia… Marcalos cuando se pagan y quedan como gasto del mes.</div></div></div>
+        <div class="card-head"><div><h2>Pagos y cobros fijos</h2><div class="sub">Sueldo, alquiler, luz, gas, tarjetas, apps de la agencia… Marcá «Pagué» o «Cobré» y queda en el mes.</div></div></div>
         <div class="tbl"><table><thead><tr><th>Pago</th><th>De quién</th><th>Próximo</th><th class="n">Monto</th><th class="n">USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tFijos"></tbody></table></div>
       </div>
       <div class="card">
-        <div class="card-head"><h2>Agregar pago fijo</h2></div>
+        <div class="card-head"><h2>Agregar pago o cobro fijo</h2></div>
         <form id="fFijo" autocomplete="off">
           <div class="f2">
-            <label>Nombre<input id="fNombre" maxlength="60" required placeholder="Ej.: Alquiler, Claude, Make"></label>
+            <label>Nombre<input id="fNombre" maxlength="60" required placeholder="Ej.: Alquiler, Sueldo, Claude"></label>
             <label>De quién<select id="fAmbito"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
           </div>
+          <label>Es un<select id="fTipo"><option value="gasto">Pago (sale plata)</option><option value="ingreso">Cobro (entra plata, ej. sueldo)</option></select></label>
           <div class="f3">
             <label>Monto<input id="fMonto" type="number" inputmode="decimal" step="0.01" min="0" required></label>
             <label>Moneda<select id="fMoneda"></select></label>
