@@ -1,13 +1,13 @@
 {
-  "name": "Mis Finanzas",
-  "short_name": "Finanzas",
-  "description": "Ingresos, gastos, pagos fijos y meta de ahorro de José.",
+  "name": "Al Día",
+  "short_name": "Al Día",
+  "description": "Tus ingresos, gastos, pagos fijos, deudas y meta de ahorro.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F7F2E8",
-  "theme_color": "#14110D",
+  "theme_color": "#070707",
   "lang": "es",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

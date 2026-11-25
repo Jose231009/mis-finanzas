@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Mis Finanzas</title>
+<title>Al Día</title>
 <meta name="theme-color" content="#F7F2E8">
-<meta name="description" content="Registro personal de ingresos, gastos, pagos fijos y meta de ahorro.">
+<meta name="description" content="Al Día: tus ingresos, gastos, pagos fijos, deudas y meta de ahorro.">
+<meta name="application-name" content="Al Día">
+<meta name="apple-mobile-web-app-title" content="Al Día">
 <meta name="robots" content="noindex,nofollow">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -53,6 +57,7 @@ h2{font-size:1.02rem}
 .side{position:sticky;top:0;height:100vh;padding:24px 18px calc(24px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:18px}
 .side .panel{background:var(--navy);color:#fff;border:1px solid var(--oro-borde);box-shadow:inset 0 0 0 1px rgba(255,236,190,.05), 0 18px 40px -12px rgba(20,14,6,.45);border-radius:var(--r);height:100%;padding:22px 14px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(40px)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.18em;font-size:.78rem;padding:2px 10px 18px;border-bottom:1px solid;border-image:linear-gradient(90deg,transparent,rgba(212,175,106,.6),transparent) 1}
+.brand .logo{width:32px;height:32px;display:block;flex:0 0 auto;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
 .brand i{width:28px;height:28px;border-radius:9px;background:var(--brand-bg);color:var(--brand-ink);display:grid;place-items:center;font-style:normal;font-weight:800;letter-spacing:0}
 .nav{display:flex;flex-direction:column;gap:4px;margin-top:12px}
 .nav button{display:flex;align-items:center;gap:12px;background:transparent;border:1px solid transparent;border-radius:15px;padding:11px 12px;color:#fff;font-weight:600;text-align:left}
@@ -301,7 +306,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 <body>
 <div id="vLogin" class="login" hidden>
   <div class="card">
-    <div class="brand" style="border:0;padding:0 0 16px"><i>$</i> MIS FINANZAS</div>
+    <div class="brand" style="border:0;padding:0 0 16px"><img class="logo" src="logo-96.png" alt="" width="32" height="32"> AL DÍA</div>
     <h1>Entrá a tus finanzas</h1>
     <p class="muted" style="margin:0 0 16px">Es privado: solo tu usuario puede ver estos datos.</p>
     <form id="fLogin" autocomplete="on">
@@ -317,7 +322,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 <div id="vApp" class="app" hidden>
   <aside class="side">
     <div class="panel">
-      <div class="brand"><i>$</i> MIS FINANZAS</div>
+      <div class="brand"><img class="logo" src="logo-96.png" alt="" width="32" height="32"> AL DÍA</div>
       <nav class="nav" id="nav"></nav>
       <div class="help"><b>Cargá todo</b>Uber, comidas, súper, alquiler… Cuanto más cargues, mejor ves dónde ahorrar.<div style="margin-top:12px"><button class="btn sm" data-add>+ Cargar gasto</button></div></div>
     </div>
@@ -325,7 +330,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 
   <main class="main">
     <div class="topbar">
-      <div><div class="crumb">Mis finanzas / <b id="crumb">Resumen</b></div><h1 id="titulo">Resumen</h1></div>
+      <div><div class="crumb">Al Día / <b id="crumb">Resumen</b></div><h1 id="titulo">Resumen</h1></div>
       <div class="mes" aria-label="Mes"><button id="mPrev" aria-label="Mes anterior">‹</button><span id="mLbl">—</span><button id="mNext" aria-label="Mes siguiente">›</button></div>
       <div class="seg libro" id="libroSeg" role="group" aria-label="Qué querés ver"><button data-libro="todo" aria-pressed="true">Todo</button><button data-libro="personal" aria-pressed="false"><i class="pt per" aria-hidden="true"></i>Personal</button><button data-libro="agencia" aria-pressed="false"><i class="pt age" aria-hidden="true"></i>Agencia</button></div>
       <div class="who hide-m"><span id="whoMail"></span><button id="salir">Salir</button></div>

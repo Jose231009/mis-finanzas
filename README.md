@@ -1,4 +1,4 @@
-# Mis Finanzas
+# Al Día
 
 App personal (PWA) para registrar ingresos, gastos, pagos fijos y la meta de ahorro. Se instala desde Chrome o el celular.
 
