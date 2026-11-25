@@ -340,11 +340,11 @@ function renderFijos(tb, completo, cobros = false) {
     const amb = `<span class="chip ${esc(f.ambito)}">${f.ambito === "agencia" ? "Agencia" : "Personal"}</span>`;
     const prox = p.toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
     const pausa = (f.pausa_meses || []).length ? ` · sin pago en ${f.pausa_meses.map(k => MESES[k - 1]).join(" y ")}` : "";
-    const nombre = `<b>${esc(f.nombre)}</b>${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}${esc(pausa)}</div>`;
+    const nombre = `<b>${esc(f.nombre)}</b>${f.calendar ? ` <span class="chip">en Calendar</span>` : ""}<div class="soft" style="font-size:.74rem">${esc(f.categoria)} · ${f.frecuencia === "anual" ? "anual" : "día " + esc(f.dia)}${esc(pausa)}</div><div class="solo-m monto-m"><b class="num ${cobro ? "pos" : ""}">${cobro ? "+" : ""}${esc(usd(enUSD(f.monto, f.moneda)))}</b>${f.moneda !== "USD" ? ` · ${esc(fmtNum(Number(f.monto), f.moneda))}` : ""}</div>`;
     const usdTxt = `${cobro ? "+" : ""}${usd(enUSD(f.monto, f.moneda))}`;
-    if (!completo) return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td></tr>`;
+    if (!completo) return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td style="white-space:nowrap">${esc(prox)}${cuando ? ` <span class="chip soon hide-m">${esc(cuando)}</span>` : ""}</td><td class="n num hide-m ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td></tr>`;
     const borrar = st.borrando === "f:" + f.id ? `<button class="btn sm danger" data-del-f="${esc(f.id)}">Borrar</button> <button class="btn sm ghost" data-cancel>No</button>` : `<button class="btn sm ghost" data-ask="f:${esc(f.id)}" aria-label="Borrar">×</button>`;
-    return `<tr><td>${nombre}</td><td>${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num">${esc(fmtNum(Number(f.monto), f.moneda))}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td><td style="white-space:nowrap">${borrar}</td></tr>`;
+    return `<tr><td>${nombre}</td><td class="hide-m">${amb}</td><td style="white-space:nowrap">${esc(prox)}${cuando ? ` <span class="chip soon hide-m">${esc(cuando)}</span>` : ""}</td><td class="n num hide-m">${esc(fmtNum(Number(f.monto), f.moneda))}</td><td class="n num hide-m ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td><td style="white-space:nowrap">${borrar}</td></tr>`;
   }).join("");
 }
 // ---------- meta, hábito de ahorro y proyección ----------
@@ -420,7 +420,9 @@ function renderProy() {
   $("proy").innerHTML = `<p class="proy-res">${resumen}${sinFecha.length ? ` <span class="soft">Sin fecha en la cuenta: ${esc(sinFecha.map(d => `${d.nombre} ${fmtMon(estadoDeuda(d).resta, d.moneda)}`).join(", "))}.</span>` : ""}</p>
     <div class="tbl"><table class="proy"><thead><tr><th>Mes</th><th class="n">Entra</th><th class="n">Sale</th><th class="n">Queda</th>${conMeta ? `<th class="n">Para la meta</th><th class="n">Libre</th>` : ""}<th>Qué cambia</th></tr></thead><tbody>
     ${filas.map(f => `<tr><td style="white-space:nowrap;text-transform:capitalize">${esc(mesCorto(f.mm + "-01"))}</td><td class="n num pos">${esc(usd(f.ent))}</td><td class="n num">${esc(usd(f.sal))}</td><td class="n num ${f.queda < 0 ? "neg" : ""}"><b>${esc(usd(f.queda))}</b></td>${conMeta ? `<td class="n num">${esc(usd(f.plan))}</td><td class="n num ${f.libre < 0 ? "neg" : "pos"}"><b>${esc(usd(f.libre))}</b></td>` : ""}<td class="soft" style="font-size:.76rem">${esc(f.notas.join(" · "))}</td></tr>`).join("")}
-    </tbody></table></div>`;
+    </tbody></table></div>
+    <ul class="proy-m">${filas.map(f => `<li><div class="h"><b style="text-transform:capitalize">${esc(mesCorto(f.mm + "-01"))}</b><span class="${(conMeta ? f.libre : f.queda) < 0 ? "neg" : "pos"}">${conMeta ? "Libre" : "Queda"} <b>${esc(usd(conMeta ? f.libre : f.queda))}</b></span></div>
+      <div class="d">Entra ${esc(usd(f.ent))} · Sale ${esc(usd(f.sal))}${conMeta ? ` · Queda ${esc(usd(f.queda))} · Meta ${esc(usd(f.plan))}` : ""}</div>${f.notas.length ? `<div class="n">${esc(f.notas.join(" · "))}</div>` : ""}</li>`).join("")}</ul>`;
 }
 
 // ---------- créditos y deudas ----------
@@ -628,10 +630,10 @@ function renderMovs() {
     const enCuotas = x.cuotas > 1 && x.deuda_id && st.deudas.some(d => d.id === x.deuda_id && d.tipo === "cuotas");
     const borrar = crm ? `<span class="chip">CRM</span>` : st.borrando === "m:" + x.id
       ? (enCuotas ? `<button class="btn sm danger" data-del-d="${esc(x.deuda_id)}">Borrar las ${esc(x.cuotas)} cuotas</button>` : `<button class="btn sm danger" data-del-m="${esc(x.id)}">Borrar</button>`) + ` <button class="btn sm ghost" data-cancel>No</button>`
-      : `<button class="btn sm ghost mover" data-mover="${esc(x.id)}" title="Si lo cargaste en el lado equivocado">Pasar a ${x.ambito === "agencia" ? "personal" : "agencia"}</button> <button class="btn sm ghost" data-ask="m:${esc(x.id)}" aria-label="Borrar">×</button>`;
-    return `<tr><td class="num">${esc(ddmm(x.fecha))}</td><td>${esc(x.concepto || x.categoria)}<div class="soft" style="font-size:.74rem">${esc(metodoTxt(x) || (crm ? "Facturas cobradas" : ""))}</div></td>
-      <td><span class="chip ${esc(x.ambito)}">${esc(x.categoria)}</span>${NO_SUMA.has(x.categoria) ? ` <span class="chip">no suma</span>` : ""}</td>
-      <td class="n num">${esc(fmtNum(Number(x.monto), x.moneda))}</td><td class="n num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</td><td style="white-space:nowrap">${borrar}</td></tr>`; }).join("")
+      : `<button class="btn sm ghost mover" data-mover="${esc(x.id)}" title="Si lo cargaste en el lado equivocado" aria-label="Pasar a ${x.ambito === "agencia" ? "personal" : "agencia"}"><span class="hide-m">Pasar a ${x.ambito === "agencia" ? "personal" : "agencia"}</span><span class="solo-m" aria-hidden="true">⇄</span></button> <button class="btn sm ghost" data-ask="m:${esc(x.id)}" aria-label="Borrar">×</button>`;
+    return `<tr><td class="num">${esc(ddmm(x.fecha))}</td><td>${esc(x.concepto || x.categoria)}<div class="soft" style="font-size:.74rem">${esc(metodoTxt(x) || (crm ? "Facturas cobradas" : ""))}<span class="solo-m">${metodoTxt(x) || crm ? " · " : ""}${esc(x.categoria)}${x.moneda !== "USD" ? " · " + esc(fmtNum(Number(x.monto), x.moneda)) : ""}</span></div></td>
+      <td class="hide-m"><span class="chip ${esc(x.ambito)}">${esc(x.categoria)}</span>${NO_SUMA.has(x.categoria) ? ` <span class="chip">no suma</span>` : ""}</td>
+      <td class="n num hide-m">${esc(fmtNum(Number(x.monto), x.moneda))}</td><td class="n num ${ing ? "pos" : ""}">${ing ? "+" : "−"}${esc(usd(enUSD(x.monto, x.moneda)))}</td><td style="white-space:nowrap">${borrar}</td></tr>`; }).join("")
     : `<tr><td colspan="6"><div class="empty">Sin movimientos en ${esc(nombreMes(st.mes))}${st.libro !== "todo" ? (st.libro === "agencia" ? " de la agencia" : " personales") : ""}${st.q ? " con esta búsqueda" : ""}. Tocá «+» para cargar.</div></td></tr>`;
 }
 function renderCfg() {
