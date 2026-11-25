@@ -216,6 +216,26 @@ input::placeholder{color:#A9A6B8}
 .sheet .card-head{margin-bottom:10px}
 .x{background:#F4EDE0;border:0;border-radius:10px;width:34px;height:34px;font-size:1.1rem}
 
+/* topes */
+.topes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.tope{display:grid;gap:8px;align-content:start;background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.3);border-radius:18px;padding:14px 16px;box-shadow:inset 0 1px 0 #fff, 0 10px 22px -16px rgba(80,60,25,.4)}
+.tope-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.tope-h b{display:block;font-size:.9rem;overflow-wrap:anywhere}
+.tope-h small{display:block;font-size:.72rem;color:var(--muted);margin-top:1px}
+.tope .v{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.tope .v span{font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:0}
+.tope .hbar{height:10px}
+.tope .hbar > i{background:linear-gradient(90deg,#05CD99,#01B574)}
+.tope.warn .hbar > i{background:linear-gradient(90deg,#F2B93B,#E09A12)}
+.tope.over .hbar > i{background:linear-gradient(90deg,#F36A7B,#E0334A)}
+.tope-x{font-size:.76rem;color:var(--muted)} .tope-x b{color:var(--ink)}
+.tope.warn .tope-x b{color:#A86A00} .tope.over .tope-x b{color:#C8253A}
+.tope.over{border-color:rgba(224,51,74,.35)}
+.topes-lista{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.topes-lista li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;border:1px solid rgba(201,174,128,.28);background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border-radius:14px;padding:10px 14px;font-size:.84rem}
+.topes-lista .m{color:var(--muted);font-size:.8rem}
+.topes-lista .m b{color:var(--ink)}
+
 /* personal / agencia */
 .pt{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
 .pt.per{background:#0B7FA8} .pt.age{background:#6A4BDB}
@@ -311,6 +331,11 @@ input::placeholder{color:#A9A6B8}
         <div class="card kpi"><div><div class="t" id="kGasT">Gastos del mes</div><div class="v num" id="kGas">—</div></div><div class="icon" data-i="card"></div><div class="spark" id="spGas"></div></div>
         <div class="card kpi"><div><div class="t" id="kAhoT">Te queda</div><div class="v num" id="kAho">—</div></div><div class="icon" data-i="piggy"></div><div class="spark" id="spAho"></div></div>
         <div class="card kpi"><div><div class="t" id="kFijT">Pagos fijos del mes</div><div class="v num" id="kFij">—</div></div><div class="icon" data-i="cal"></div><div class="meter" aria-hidden="true"><i id="fijMeter" style="width:0%"></i></div></div>
+      </div>
+
+      <div class="card" id="topesCard">
+        <div class="card-head"><div><h2>Tus topes</h2><div class="sub" id="topesSub">—</div></div><button class="btn sm ghost" data-go="ajustes">Editar topes</button></div>
+        <div id="topesR"></div>
       </div>
 
       <div class="row-a">
@@ -458,6 +483,29 @@ input::placeholder{color:#A9A6B8}
 
     <!-- META Y AJUSTES -->
     <section data-view="ajustes" class="grid" hidden>
+      <div class="card">
+        <div class="card-head"><div><h2>Topes de gasto</h2><div class="sub">Cuánto te permitís gastar por semana, por quincena o por mes. La semana va de lunes a domingo; las quincenas, del 1 al 15 y del 16 a fin de mes.</div></div></div>
+        <div id="topesLista"></div>
+        <h3 style="font-size:.92rem;margin:18px 0 0">Poner o cambiar un tope</h3>
+        <form id="fTope" autocomplete="off" style="margin-top:10px">
+          <div class="f2">
+            <label>De quién<select id="tAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
+            <label>Qué gasto<select id="tCat"></select></label>
+          </div>
+          <div class="f3">
+            <label>Por semana<input id="tSem" type="number" inputmode="decimal" min="0" step="any" placeholder="Sin tope"></label>
+            <label>Por quincena<input id="tQui" type="number" inputmode="decimal" min="0" step="any" placeholder="Sin tope"></label>
+            <label>Por mes<input id="tMes" type="number" inputmode="decimal" min="0" step="any" placeholder="Sin tope"></label>
+          </div>
+          <div class="f2">
+            <label>Moneda<select id="tMon"></select></label>
+            <label class="check"><span>Qué cuenta</span><select id="tSolo"><option value="1">Solo el gasto del día a día</option><option value="0">Todo, también fijos, cuotas y deudas</option></select></label>
+          </div>
+          <div class="hint">«Solo el gasto del día a día» deja afuera alquiler y servicios, los pagos fijos, las cuotas que ya venías pagando y los pagos de deudas.</div>
+          <div class="hint" id="tSug"></div>
+          <button class="btn" type="submit">Guardar topes</button>
+        </form>
+      </div>
       <div class="card">
         <div class="card-head"><div><h2>Meta y ajustes</h2><div class="sub">Todo se muestra en dólares. Cambiá las tasas cuando quieras y se recalcula.</div></div></div>
         <form id="fCfg" autocomplete="off">
