@@ -8,12 +8,12 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession
 
 const CATS = {
   gasto: {
-    personal: ["Comidas oficina","Comidas y delivery","Uber y transporte","Supermercado","Lujos de fin de semana","Ocio y salidas","Ropa","Salud","Gimnasio y deporte","Peluquería","Viajes","Educación","Familia","Hogar","Limpieza","Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Suscripciones personales","Créditos y préstamos","Pago de tarjeta","Otros"],
+    personal: ["Comidas oficina","Comidas y delivery","Uber y transporte","Supermercado","Lujos de fin de semana","Ocio y salidas","Ropa","Salud","Gimnasio y deporte","Peluquería","Viajes","Educación","Familia","Hogar","Limpieza","Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Suscripciones personales","Créditos y préstamos","Pago de tarjeta","Ahorro","Otros"],
     agencia: ["Apps y suscripciones","Publicidad propia","Equipo y sueldos","Freelancers","Comisiones bancarias","Impuestos","Equipamiento","Créditos y préstamos","Otros agencia"]
   },
-  ingreso: { personal: ["Sueldo","Trabajo personal","Otros ingresos"], agencia: ["Otros ingresos agencia"] }
+  ingreso: { personal: ["Sueldo","Trabajo personal","Otros ingresos"], agencia: ["Clientes fuera del CRM","Otros ingresos agencia"] }
 };
-const NO_SUMA = new Set(["Pago de tarjeta"]);           // el resumen de la tarjeta no suma: sus consumos ya se cargan uno por uno
+const NO_SUMA = new Set(["Pago de tarjeta", "Ahorro"]); // el resumen de la tarjeta no suma (sus consumos se cargan uno por uno); el ahorro es plata que guardás, no un gasto
 const FIJAS = new Set(["Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Limpieza"]);
 const MONEDAS = ["USD","EUR","ARS","MXN","COP","GBP","CLP"];
 const TARJETAS_DEF = ["Visa", "Mastercard", "Sra. Ana María"];
@@ -67,7 +67,7 @@ const metodoTxt = (x) => x.tarjeta ? `Tarjeta ${x.tarjeta}` : (x.metodo || "");
 const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 const ddmm = (f) => `${String(f).slice(8, 10)}/${String(f).slice(5, 7)}`;
 
-const st = { user: null, demo: false, movs: [], crm: [], fijos: [], topes: [], deudas: [], pagosDeu: [], pagando: null, cfg: structuredClone(CFG_DEF), mes: mesDe(hoy()), vista: "resumen",
+const st = { user: null, demo: false, movs: [], crm: [], fijos: [], topes: [], inversiones: [], factur: [], ahorrando: false, deudas: [], pagosDeu: [], pagando: null, cfg: structuredClone(CFG_DEF), mes: mesDe(hoy()), vista: "resumen",
   tipo: "gasto", ambito: "personal", cat: null, libro: "todo", q: "", borrando: null };
 
 function toast(t, ms = 2800) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), ms); }
@@ -103,17 +103,19 @@ async function entrar(user) {
 }
 async function cargar() {
   const desde = sumaMes(mesDe(hoy()), -14) + "-01";
-  const [m, f, c, r, d, pd, tp] = await Promise.all([
+  const [m, f, c, r, d, pd, tp, iv, fc] = await Promise.all([
     sb.from("fin_movimientos").select("*").gte("fecha", desde).order("fecha", { ascending: false }),
     sb.from("fin_fijos").select("*").order("dia"),
     sb.from("fin_config").select("*").maybeSingle(),
     sb.rpc("fin_ingresos_crm", { desde }),
     sb.from("fin_deudas").select("*").order("creado"),
     sb.from("fin_movimientos").select("id,deuda_id,monto,fecha,cuota").not("deuda_id", "is", null),
-    sb.from("fin_topes").select("*").order("creado")
+    sb.from("fin_topes").select("*").order("creado"),
+    sb.from("fin_inversiones").select("*").order("fecha"),
+    sb.rpc("fin_facturacion_crm", { desde: sumaMes(mesDe(hoy()), -3) + "-01" })
   ]);
   if (m.error || f.error) { toast("Tu usuario no tiene acceso a estos datos."); }
-  st.movs = m.data || []; st.fijos = f.data || []; st.deudas = d.data || []; st.pagosDeu = pd.data || []; st.topes = tp.data || [];
+  st.movs = m.data || []; st.fijos = f.data || []; st.deudas = d.data || []; st.pagosDeu = pd.data || []; st.topes = tp.data || []; st.inversiones = iv.data || []; st.factur = fc.data || [];
   if (c.data) st.cfg = { ...CFG_DEF, ...c.data, tarjetas: Array.isArray(c.data.tarjetas) ? c.data.tarjetas : TARJETAS_DEF, tasas: { ...CFG_DEF.tasas, ...(c.data.tasas || {}) } };
   metodos();
   st.crm = (r.data || []).map(x => ({ id: `crm-${x.mes}-${x.moneda}`, tipo: "ingreso", ambito: "agencia", categoria: "Clientes (CRM)",
@@ -191,26 +193,29 @@ function renderResumen() {
   const ult = [-5, -4, -3, -2, -1, 0].map(k => totales(sumaMes(m, k)));
   spark("spIng", ult.map(t => t.ing), "#01B574"); spark("spGas", ult.map(t => t.gas), "#F0475B"); spark("spAho", ult.map(t => t.ing - t.gas), "#C9973B");
 
-  // meta (solo cuenta lo que ya pasó: las cuotas futuras no restan todavía)
-  const c = st.cfg, ini = c.inicio || CFG_DEF.inicio, fmeta = c.fecha_meta || CFG_DEF.fecha_meta, meta = Number(c.meta) || 0, h = hoy();
-  let acum = 0; for (const x of todos()) { const f = x.fecha || ""; if (f < ini || f > h) continue; const v = enUSD(x.monto, x.moneda); x.tipo === "ingreso" ? (acum += v) : cuenta(x) && (acum -= v); }
+  // meta: cuenta lo que separás de verdad cada mes (botón «Separé el ahorro»)
+  const MP = metaPlan(), { ini, fmeta, meta, antes, mesesTot, porMes } = MP, acum = MP.ahorrado, h = hoy();
   const pct = meta ? Math.max(0, Math.min(100, acum / meta * 100)) : 0;
-  const mesesEntre = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
-  const mesesRest = Math.max(1, mesesEntre(actual, fmeta) + 1), mesesTot = Math.max(1, mesesEntre(ini, fmeta) + 1);
-  const porMes = Math.max(0, meta - acum) / mesesRest, antes = h < ini;
-  const transcurrido = antes ? 0 : Math.min(mesesTot, mesesEntre(ini, actual) + Number(h.slice(8, 10)) / diasMes(actual));
+  const transcurrido = antes ? 0 : Math.min(mesesTot, MP.mesesEntre(ini, actual) + Number(h.slice(8, 10)) / diasMes(actual));
   const esperado = meta * transcurrido / mesesTot;
   $("metaFill").style.width = pct.toFixed(1) + "%"; $("metaBar").setAttribute("aria-valuenow", pct.toFixed(0));
   $("metaPct").textContent = `${pct.toFixed(0)} %`;
   $("metaAcum").textContent = usdFijo(Math.max(0, acum)); $("metaDe").textContent = `de ${usdFijo(meta)} ahorrados`;
   $("metaFin").textContent = `${usdFijo(meta)} · ${mesCorto(fmeta)}`;
   $("metaFalta").textContent = usdFijo(Math.max(0, meta - acum));
-  $("metaMes").textContent = usdFijo(antes ? meta / mesesTot : porMes);
+  $("metaMes").textContent = usdFijo(porMes);
   const hoyEl = $("metaHoy"); hoyEl.hidden = antes || !meta; if (meta) hoyEl.style.left = Math.min(100, esperado / meta * 100).toFixed(1) + "%";
   $("metaRitmoT").textContent = antes ? "Empieza a contar" : "Deberías tener hoy";
   $("metaRitmo").textContent = antes ? ini.split("-").reverse().join("/") : usdFijo(esperado);
-  $("metaSub").innerHTML = antes ? esc(`Empieza el ${ini.split("-").reverse().join("/")}`)
-    : `Hasta el ${esc(fmeta.split("-").reverse().join("/"))} · <b class="${acum >= esperado ? "pos" : "neg"}">${acum >= esperado ? "vas adelantado" : "vas atrás"}</b>`;
+  const racha = rachaAhorro(), sepMes = ahorroDelMes(actual);
+  $("metaSub").innerHTML = (antes ? esc(`Empieza el ${ini.split("-").reverse().join("/")}`)
+    : `Hasta el ${esc(fmeta.split("-").reverse().join("/"))} · <b class="${acum >= esperado ? "pos" : "neg"}">${acum >= esperado ? "vas adelantado" : "vas atrás"}</b>`)
+    + (racha ? ` · racha de <b>${racha} ${racha === 1 ? "mes" : "meses"}</b>` : "");
+  const sug = Math.ceil(porMes / 10) * 10;
+  $("habV").innerHTML = sepMes > 0 ? `<b class="pos">✓ ${esc(usdFijo(sepMes))} separados</b>`
+    : st.ahorrando ? `<form class="pago" id="fAhorro"><input type="number" inputmode="decimal" min="1" step="any" value="${esc(sug)}" required aria-label="Cuánto separaste, en dólares"><button class="btn sm" type="submit">Guardar</button><button class="btn sm ghost" type="button" data-cancel aria-label="Cancelar">×</button></form>`
+    : `<button class="btn sm" data-ahorro>Separé el ahorro</button>`;
+  $("habT").textContent = sepMes > 0 ? `Ahorro de ${MESES[Number(actual.slice(5)) - 1]}` : `Este mes separá ${usdFijo(sug)}`;
   const margen = t.iA > 0 ? Math.round(t.ganancia / t.iA * 100) : 0;
   const porCobrar = L === "agencia" ? [] : st.fijos.filter(f => f.activo !== false && esCobro(f) && f.ambito === "personal" && fijoEnMes(f, m) && !pagadoEnMes(f, m));
   const falta = porCobrar.length ? ` Falta cobrar: ${porCobrar.map(f => `${f.nombre} (${usd(enUSD(f.monto, f.moneda))})`).join(", ")}.` : "";
@@ -233,7 +238,7 @@ function renderResumen() {
   $("ringVal").textContent = t.ing > 0 ? `${Math.round(aho / t.ing * 100)}%` : "—";
   $("ringT1").textContent = L === "agencia" ? "Margen" : "Ahorro"; $("ringT2").textContent = L === "agencia" ? "de lo cobrado" : "de lo que entró";
 
-  renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m); renderDeudas($("deuR"), $("deuSubR"), false); renderTopes();
+  renderEvo(m); renderDia(m); renderStats(m); renderFijos($("tFijosR"), false); renderIns(m); renderUltimos(m); renderDeudas($("deuR"), $("deuSubR"), false); renderTopes(); renderProy();
 }
 
 function spark(id, vals, color) {
@@ -319,6 +324,82 @@ function renderFijos(tb, completo, cobros = false) {
     return `<tr><td>${nombre}</td><td>${amb}</td><td>${esc(prox)} ${cuando ? `<span class="chip soon">${esc(cuando)}</span>` : ""}</td><td class="n num">${esc(fmtNum(Number(f.monto), f.moneda))}</td><td class="n num ${cobro ? "pos" : ""}">${esc(usdTxt)}</td><td>${est}</td><td style="white-space:nowrap">${borrar}</td></tr>`;
   }).join("");
 }
+// ---------- meta, hábito de ahorro y proyección ----------
+const mesesEntreF = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
+const esAhorro = (x) => x.tipo === "gasto" && x.categoria === "Ahorro";
+const ahorroDelMes = (mm) => st.movs.reduce((a, x) => a + (esAhorro(x) && mesDe(x.fecha) === mm ? enUSD(x.monto, x.moneda) : 0), 0);
+function metaPlan() {
+  const c = st.cfg, ini = c.inicio || CFG_DEF.inicio, fmeta = c.fecha_meta || CFG_DEF.fecha_meta, meta = Number(c.meta) || 0, h = hoy(), antes = h < ini;
+  const ahorrado = st.movs.reduce((a, x) => a + (esAhorro(x) && x.fecha >= ini && x.fecha <= h ? enUSD(x.monto, x.moneda) : 0), 0);
+  const mesesTot = Math.max(1, mesesEntreF(ini, fmeta) + 1), mesesRest = Math.max(1, mesesEntreF(antes ? ini : h, fmeta) + 1);
+  // lo de este mes ya separado no vuelve a pedirse
+  const pendMes = antes ? 0 : ahorroDelMes(mesDe(h));
+  return { ini, fmeta, meta, antes, ahorrado, mesesTot, mesesRest, porMes: Math.max(0, meta - ahorrado + pendMes) / mesesRest, mesesEntre: mesesEntreF };
+}
+function rachaAhorro() {
+  const ini = mesDe(st.cfg.inicio || CFG_DEF.inicio); let mm = mesDe(hoy()), n = 0;
+  if (!(ahorroDelMes(mm) > 0)) mm = sumaMes(mm, -1);          // si este mes todavía no separaste, la racha sigue viva hasta fin de mes
+  while (mm >= ini && ahorroDelMes(mm) > 0) { n++; mm = sumaMes(mm, -1); }
+  return n;
+}
+// Clientes del CRM: promedio facturado (cobrado + por cobrar) de los últimos 3 meses, incluido el actual
+function estimadoCRM() {
+  const ms = [0, -1, -2].map(k => sumaMes(mesDe(hoy()), k)).map(mm => st.factur.filter(x => x.mes === mm).reduce((a, x) => a + enUSD(x.facturado, x.moneda), 0)).filter(v => v > 0);
+  return ms.length ? ms.reduce((a, v) => a + v, 0) / ms.length : 0;
+}
+function cambiosDelMes(mm, L) {
+  const out = [], ok = (amb) => L === "todo" || amb === L;
+  for (const d of st.deudas) {
+    if (d.activo === false || !ok(d.ambito)) continue;
+    const fs = st.pagosDeu.filter(p => p.deuda_id === d.id).map(p => p.fecha).sort();
+    if (!fs.length) continue;
+    if (mesDe(fs[fs.length - 1]) === mm) out.push(`termina ${d.nombre}`);
+    else if (mesDe(fs[0]) === mm && !Number(d.pagado_inicial) && fs[0] > hoy()) out.push(`empieza ${d.nombre}`);
+  }
+  for (const f of st.fijos) {
+    if (f.activo === false || f.frecuencia === "anual" || !ok(f.ambito) || !(f.pausa_meses || []).length) continue;
+    const ahora = fijoEnMes(f, mm), antes = fijoEnMes(f, sumaMes(mm, -1));
+    if (!ahora && antes) out.push(`sin ${f.nombre.toLowerCase()}`); else if (ahora && !antes) out.push(`vuelve ${f.nombre.toLowerCase()}`);
+  }
+  return out;
+}
+function renderProy() {
+  const L = st.libro, ini = st.cfg.inicio || CFG_DEF.inicio; let m0 = mesDe(hoy()); if (mesDe(ini) > m0) m0 = mesDe(ini);
+  const meses = Array.from({ length: 12 }, (_, i) => sumaMes(m0, i)), crm = estimadoCRM(), fij = st.fijos.filter(f => f.activo !== false);
+  // préstamos que se pagan a mano (no tienen cuotas programadas): su cuota se proyecta hasta que terminen
+  const manuales = st.deudas.filter(d => d.activo !== false && d.tipo !== "cuotas" && Number(d.cuota_monto) > 0).map(d => {
+    const e = estadoDeuda(d), desde = mesDe(proximaFecha(d.dia_pago)), n = e.terminada ? 0 : Math.ceil(e.resta / e.cuotaMonto - 1e-9);
+    return { d, e, desde, n };
+  });
+  const cuotaManual = (mm, amb) => manuales.reduce((a, { d, e, desde, n }) => { if (d.ambito !== amb) return a; const k = mesesEntreF(desde, mm);
+    return a + (k >= 0 && k < n ? enUSD(Math.min(e.cuotaMonto, e.resta - k * e.cuotaMonto), d.moneda) : 0); }, 0);
+  const lado = (mm, amb) => ({
+    ent: fij.filter(f => esCobro(f) && f.ambito === amb && fijoEnMes(f, mm)).reduce((a, f) => a + enUSD(f.monto, f.moneda), 0) + (amb === "agencia" ? crm : 0),
+    sal: fij.filter(f => !esCobro(f) && f.ambito === amb && fijoEnMes(f, mm)).reduce((a, f) => a + enUSD(f.monto, f.moneda), 0)
+       + st.movs.reduce((a, x) => a + (x.deuda_id && x.tipo === "gasto" && x.ambito === amb && mesDe(x.fecha) === mm ? enUSD(x.monto, x.moneda) : 0), 0)
+       + cuotaManual(mm, amb) });
+  const MP = metaPlan(), conMeta = L !== "agencia";
+  let acum = MP.ahorrado;
+  const filas = meses.map((mm, i) => {
+    const P = lado(mm, "personal"), A = lado(mm, "agencia");
+    const ent = L === "agencia" ? A.ent : L === "personal" ? P.ent + (A.ent - A.sal) : P.ent + A.ent;
+    const sal = L === "agencia" ? A.sal : L === "personal" ? P.sal : P.sal + A.sal;
+    const queda = ent - sal, plan = conMeta && mm <= mesDe(MP.fmeta) ? Math.max(0, Math.ceil(MP.porMes / 10) * 10 - (i === 0 ? ahorroDelMes(mm) : 0)) : 0;
+    acum += plan;
+    return { mm, ent, sal, queda, plan, libre: queda - plan, acum, notas: cambiosDelMes(mm, L) };
+  });
+  const prom = filas.reduce((a, f) => a + f.libre, 0) / filas.length, neg = filas.filter(f => f.libre < 0).length;
+  $("proySub").textContent = `${L === "personal" ? "Tu sueldo más lo que te deja la agencia" : L === "agencia" ? "Agencia" : "Todo junto"} · clientes estimados en ${usdFijo(crm)} por mes (promedio facturado de los últimos 3 meses) · tarjetas por el resumen`;
+  const sinFecha = st.deudas.filter(d => d.activo !== false && (L === "todo" || d.ambito === L) && d.tipo !== "cuotas" && !(Number(d.cuota_monto) > 0) && !estadoDeuda(d).terminada);
+  const resumen = conMeta
+    ? `Si separás <b>${esc(usdFijo(Math.ceil(MP.porMes / 10) * 10))}</b> por mes, en ${esc(mesCorto(MP.fmeta))} llegás a tu meta de <b>${esc(usdFijo(MP.meta))}</b>${MP.ahorrado ? ` (ya llevás ${esc(usdFijo(MP.ahorrado))})` : ""}. Después de separar el ahorro te quedan libres en promedio <b class="${prom >= 0 ? "pos" : "neg"}">${esc(usd(prom))}</b> por mes${neg ? ` (ojo: ${neg} ${neg === 1 ? "mes da" : "meses dan"} negativo)` : ""}.`
+    : `La agencia te deja en promedio <b class="${prom >= 0 ? "pos" : "neg"}">${esc(usd(prom))}</b> por mes.`;
+  $("proy").innerHTML = `<p class="proy-res">${resumen}${sinFecha.length ? ` <span class="soft">Sin fecha en la cuenta: ${esc(sinFecha.map(d => `${d.nombre} ${fmtMon(estadoDeuda(d).resta, d.moneda)}`).join(", "))}.</span>` : ""}</p>
+    <div class="tbl"><table class="proy"><thead><tr><th>Mes</th><th class="n">Entra</th><th class="n">Sale</th><th class="n">Queda</th>${conMeta ? `<th class="n">Para la meta</th><th class="n">Libre</th>` : ""}<th>Qué cambia</th></tr></thead><tbody>
+    ${filas.map(f => `<tr><td style="white-space:nowrap;text-transform:capitalize">${esc(mesCorto(f.mm + "-01"))}</td><td class="n num pos">${esc(usd(f.ent))}</td><td class="n num">${esc(usd(f.sal))}</td><td class="n num ${f.queda < 0 ? "neg" : ""}"><b>${esc(usd(f.queda))}</b></td>${conMeta ? `<td class="n num">${esc(usd(f.plan))}</td><td class="n num ${f.libre < 0 ? "neg" : "pos"}"><b>${esc(usd(f.libre))}</b></td>` : ""}<td class="soft" style="font-size:.76rem">${esc(f.notas.join(" · "))}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
 // ---------- créditos y deudas ----------
 function estadoDeuda(d) {
   const h = hoy(), pagos = st.pagosDeu.filter(p => p.deuda_id === d.id);
@@ -369,11 +450,20 @@ function renderDeudas(el, subEl, completo) {
   if (!xs.length) { el.innerHTML = `<div class="empty">¿Tenés un préstamo, una compra en cuotas o le debés plata a alguien? ${completo ? "Cargalo abajo" : "Cargalo en «Deudas»"} y ves cuánto te falta para terminar.</div>`; return; }
   const tiles = (completo ? vivas.concat(listas) : vivas.slice(0, 4)).map(x => tileDeuda(x.d, x.e, completo)).join("");
   el.innerHTML = `<div class="deu-wrap"><div class="deu-sum"><div class="big"><span>Debés en total</span><b class="num">${esc(usd(debes))}</b></div>
-    <div class="mini"><div><span>Pagás por mes</span><b class="num">${esc(usd(porMes))}</b></div><div><span>Quedás libre en</span><b>${esc(libre)}</b>${sinFecha && fines.length ? `<span>+ ${sinFecha} sin fecha de fin</span>` : ""}</div></div></div>
+    <div class="mini"><div><span>Pagás por mes</span><b class="num">${esc(usd(porMes))}</b></div>${invertido() ? `<div><span>Tenés invertido</span><b class="num">${esc(usd(invertido()))}</b></div>` : ""}<div><span>Quedás libre en</span><b>${esc(libre)}</b>${sinFecha && fines.length ? `<span>+ ${sinFecha} sin fecha de fin</span>` : ""}</div></div></div>
     <div class="deu-grid">${tiles || `<div class="empty">No te queda nada por pagar.</div>`}</div></div>`;
 }
+const invertido = () => st.inversiones.filter(x => x.activo !== false && enLibro(x)).reduce((a, x) => a + enUSD(x.monto, x.moneda), 0);
+function renderInversiones() {
+  const xs = st.inversiones.filter(x => x.activo !== false);
+  if (!$("iMon").options.length) llenar($("iMon"), MONEDAS, "USD");
+  $("invLista").innerHTML = xs.length ? `<ul class="topes-lista">${xs.map(x => {
+    const borrar = st.borrando === "i:" + x.id ? `<button class="btn sm danger" data-del-inv="${esc(x.id)}">Borrar</button> <button class="btn sm ghost" data-cancel>No</button>` : `<button class="btn sm ghost" data-ask="i:${esc(x.id)}" aria-label="Borrar ${esc(x.nombre)}">×</button>`;
+    return `<li><div><b>${esc(x.nombre)}</b><div class="m">${esc(ddmm(x.fecha))}/${esc(String(x.fecha).slice(0, 4))}${x.notas ? " · " + esc(x.notas) : ""}</div></div><span style="white-space:nowrap"><b class="num">${esc(fmtMon(Number(x.monto), x.moneda))}</b> ${borrar}</span></li>`; }).join("")}</ul>`
+    : `<div class="hint">Todavía no anotaste inversiones.</div>`;
+}
 function renderDeudasVista() {
-  renderDeudas($("deuV"), $("deuSub"), true);
+  renderDeudas($("deuV"), $("deuSub"), true); renderInversiones();
   if (!$("dMon").options.length) { llenar($("dMon"), MONEDAS, "ARS"); formDeuda(); }
   llenar($("dTar"), st.cfg.tarjetas || TARJETAS_DEF, $("dTar").value);
 }
@@ -644,6 +734,12 @@ $("fTar").addEventListener("submit", (e) => {
   $("tarNueva").value = ""; guardarTarjetas(lista.concat(t));
 });
 document.addEventListener("submit", async (e) => {
+  if (e.target.id === "fAhorro") {
+    e.preventDefault(); if (st.demo) { toast("Modo ejemplo: no se guarda nada."); return; }
+    const monto = Number(e.target.querySelector("input").value); if (!(monto > 0)) return;
+    const { error } = await sb.from("fin_movimientos").insert({ tipo: "gasto", ambito: "personal", categoria: "Ahorro", concepto: "Ahorro del mes", monto, moneda: "USD", fecha: hoy(), origen: "ahorro" });
+    st.ahorrando = false; toast(error ? "No se pudo guardar." : `¡Bien! Separaste ${usdFijo(monto)} este mes`); await cargar(); return;
+  }
   const f = e.target.closest("form.pago"); if (!f) return; e.preventDefault();
   if (st.demo) { toast("Modo ejemplo: no se guarda nada."); return; }
   const d = st.deudas.find(x => x.id === f.dataset.deu), monto = Number(f.querySelector("input").value); if (!d || !(monto > 0)) return;
@@ -652,6 +748,12 @@ document.addEventListener("submit", async (e) => {
   const { error } = await sb.from("fin_movimientos").insert({ tipo: "gasto", ambito: d.ambito, categoria: "Créditos y préstamos", concepto: `${d.nombre} (${q ? `cuota ${q}/${es.n}` : "pago"})`,
     monto, moneda: d.moneda, fecha: hoy(), origen: "deuda", deuda_id: d.id, cuota: q, cuotas: es.n || null });
   st.pagando = null; toast(error ? "No se pudo guardar el pago." : `Pago guardado: ${usd(enUSD(monto, d.moneda))}`); await cargar();
+});
+$("fInv").addEventListener("submit", async (e) => {
+  e.preventDefault(); const monto = Number($("iMonto").value); if (!(monto > 0)) { toast("Poné el monto."); return; }
+  const { error } = await sb.from("fin_inversiones").insert({ nombre: $("iNombre").value.trim(), monto, moneda: $("iMon").value, ambito: "personal", fecha: hoy() });
+  if (error) { toast("No se pudo guardar."); return; }
+  e.target.reset(); llenar($("iMon"), MONEDAS, "USD"); toast("Inversión anotada"); await cargar();
 });
 $("fCfg").addEventListener("submit", async (e) => {
   e.preventDefault(); const tasas = { USD: 1 };
@@ -693,7 +795,12 @@ document.addEventListener("click", async (e) => {
     toast(error ? "No se pudo cambiar." : `${x.concepto || x.categoria}: ahora es ${nuevo === "agencia" ? "de la agencia" : "personal"}`); await cargar(); return;
   }
   if (b.dataset.ask) { st.borrando = b.dataset.ask; render(); return; }
-  if ("cancel" in b.dataset) { st.borrando = null; st.pagando = null; render(); return; }
+  if ("cancel" in b.dataset) { st.borrando = null; st.pagando = null; st.ahorrando = false; render(); return; }
+  if ("ahorro" in b.dataset) { st.ahorrando = true; render(); return; }
+  if (b.dataset.delInv) {
+    if (st.demo) { st.borrando = null; toast("Modo ejemplo: no se guarda nada."); render(); return; }
+    const { error } = await sb.from("fin_inversiones").delete().eq("id", b.dataset.delInv); st.borrando = null; toast(error ? "No se pudo borrar." : "Inversión borrada"); await cargar(); return;
+  }
   if (b.dataset.pagodeu) { st.pagando = b.dataset.pagodeu; render(); return; }
   if (b.dataset.tarDel) { guardarTarjetas((st.cfg.tarjetas || []).filter(t => t !== b.dataset.tarDel)); return; }
   if (st.demo && (b.dataset.delM || b.dataset.delF || b.dataset.delD || b.dataset.pagar)) { st.borrando = null; toast("Modo ejemplo: no se guarda nada."); render(); return; }
@@ -752,11 +859,16 @@ function demo() {
   for (let i = 0; i < 12; i++) { const f = addMeses(ini4, i, 10); add({ tipo: "gasto", ambito: "personal", categoria: "Otros", concepto: `iPhone 16 Pro (cuota ${i + 1}/12)`, monto: 120, moneda: "EUR", fecha: f, metodo: "Tarjeta", tarjeta: "Visa", origen: "cuota", deuda_id: "dd1", cuota: i + 1, cuotas: 12 }); }
   for (let i = 0; i < 6; i++) { const f = addMeses(addMeses(hoy(), -5, 20), i, 20); add({ tipo: "gasto", ambito: "agencia", categoria: "Equipamiento", concepto: `Notebook de la agencia (cuota ${i + 1}/6)`, monto: 150, moneda: "USD", fecha: f, metodo: "Tarjeta", tarjeta: "Mastercard", origen: "cuota", deuda_id: "dd3", cuota: i + 1, cuotas: 6 }); }
   st.pagosDeu = st.movs.filter(x => x.deuda_id).map(x => ({ id: x.id, deuda_id: x.deuda_id, monto: x.monto, fecha: x.fecha, cuota: x.cuota }));
+  st.inversiones = [{ id: "i1", nombre: "Inversión en otro proyecto", ambito: "personal", monto: 1000, moneda: "USD", fecha: hoy(), activo: true }];
+  st.factur = [0, -1, -2].map(k => ({ mes: sumaMes(mes0, k), moneda: "EUR", facturado: 4900 + k * 60 }));
+  add({ tipo: "gasto", ambito: "personal", categoria: "Ahorro", concepto: "Ahorro del mes", monto: 1050, moneda: "USD", fecha: sumaMes(mes0, -1) + "-10", origen: "ahorro" });
+  st.fijos.push({ id: "fi", nombre: "Cliente fuera del CRM (ejemplo)", tipo: "ingreso", ambito: "agencia", categoria: "Clientes fuera del CRM", monto: 1000, moneda: "USD", dia: 1, frecuencia: "mensual", activo: true },
+    { id: "fe", nombre: "Media buyer (ejemplo)", ambito: "agencia", categoria: "Equipo y sueldos", monto: 700, moneda: "USD", dia: 1, frecuencia: "mensual", activo: true });
   st.topes = [["personal", "", "semanal", 200, "EUR"], ["personal", "", "mensual", 800, "EUR"], ["personal", "Comidas y delivery", "semanal", 45, "EUR"], ["personal", "Uber y transporte", "quincenal", 60, "EUR"], ["agencia", "Apps y suscripciones", "mensual", 450, "USD"]]
     .map(([ambito, categoria, periodo, monto, moneda], i) => ({ id: "t" + i, ambito, categoria, periodo, monto, moneda, solo_dia_a_dia: true }));
   metodos();
   const guardarNada = async () => toast("Modo ejemplo: no se guarda nada.");
-  ["fMov", "fFijo", "fCfg", "fDeu", "fTar", "fTope"].forEach(id => $(id).addEventListener("submit", e => { e.stopImmediatePropagation(); e.preventDefault(); guardarNada(); }, true));
+  ["fMov", "fFijo", "fCfg", "fDeu", "fTar", "fTope", "fInv"].forEach(id => $(id).addEventListener("submit", e => { e.stopImmediatePropagation(); e.preventDefault(); guardarNada(); }, true));
   render();
 }
 // #demo o #demo/ajustes, #demo/deudas…: datos de ejemplo abiertos en esa vista

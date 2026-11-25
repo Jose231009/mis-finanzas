@@ -216,6 +216,12 @@ input::placeholder{color:#A9A6B8}
 .sheet .card-head{margin-bottom:10px}
 .x{background:#F4EDE0;border:0;border-radius:10px;width:34px;height:34px;font-size:1.1rem}
 
+/* proyección y hábito */
+.proy-res{margin:0 0 14px;font-size:.88rem;line-height:1.55;max-width:90ch}
+table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgba(244,236,220,.35)}
+.meta-list li.hab{background:linear-gradient(160deg,#FFF9EC,#F6E8C8);border-color:rgba(200,144,46,.45);flex-wrap:wrap}
+.meta-list li.hab form.pago{width:auto;grid-template-columns:110px auto auto}
+
 /* topes */
 .topes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
 .tope{display:grid;gap:8px;align-content:start;background:linear-gradient(160deg,#FFFFFF,#FBF4E6);border:1px solid rgba(201,174,128,.3);border-radius:18px;padding:14px 16px;box-shadow:inset 0 1px 0 #fff, 0 10px 22px -16px rgba(80,60,25,.4)}
@@ -353,6 +359,7 @@ input::placeholder{color:#A9A6B8}
             <li><span>Te falta</span><b class="num" id="metaFalta">—</b></li>
             <li><span>Por mes hasta la fecha</span><b class="num" id="metaMes">—</b></li>
             <li><span id="metaRitmoT">Hoy deberías ir por</span><b class="num" id="metaRitmo">—</b></li>
+            <li class="hab"><span id="habT">Este mes</span><span id="habV"></span></li>
           </ul>
         </div>
         <div class="card">
@@ -389,6 +396,11 @@ input::placeholder{color:#A9A6B8}
       <div class="card">
         <div class="card-head"><div><h2>Créditos y deudas</h2><div class="sub" id="deuSubR">—</div></div><button class="btn sm ghost" data-go="deudas">Ver todas</button></div>
         <div id="deuR"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h2>Proyección · próximos 12 meses</h2><div class="sub" id="proySub">—</div></div></div>
+        <div id="proy"></div>
       </div>
 
       <div class="row-c">
@@ -457,6 +469,18 @@ input::placeholder{color:#A9A6B8}
       <div class="card">
         <div class="card-head"><div><h2>Créditos y deudas</h2><div class="sub" id="deuSub">—</div></div></div>
         <div id="deuV"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>Inversiones</h2><div class="sub">Plata que tenés puesta en otros proyectos. No cuenta como gasto.</div></div></div>
+        <div id="invLista"></div>
+        <form id="fInv" autocomplete="off" style="margin-top:12px">
+          <div class="f3">
+            <label>Qué es<input id="iNombre" maxlength="60" required placeholder="Ej.: Proyecto con un socio"></label>
+            <label>Monto<input id="iMonto" type="number" inputmode="decimal" min="0" step="any" required></label>
+            <label>Moneda<select id="iMon"></select></label>
+          </div>
+          <button class="btn" type="submit">Anotar inversión</button>
+        </form>
       </div>
       <div class="card">
         <div class="card-head"><div><h2>Agregar crédito o deuda</h2><div class="sub">Las compras en cuotas que cargás con «+» aparecen solas acá.</div></div></div>
