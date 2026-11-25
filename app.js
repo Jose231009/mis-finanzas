@@ -714,7 +714,16 @@ document.addEventListener("click", async (e) => {
 });
 $("busca").addEventListener("input", e => { st.q = e.target.value.trim(); renderMovs(); });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+// Actualización automática: cuando se publica una versión nueva, la app se recarga sola (no hace falta cerrarla).
+if ("serviceWorker" in navigator) {
+  const habia = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => {
+    window.addEventListener("focus", () => reg.update().catch(() => {}));
+    setInterval(() => reg.update().catch(() => {}), 10 * 60 * 1000);
+  }).catch(() => {});
+  let recargando = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (habia && !recargando && $("sheet").hidden) { recargando = true; location.reload(); } });
+}
 
 // Modo de ejemplo (#demo): datos inventados, nada se guarda. Solo para ver cómo queda.
 function demo() {
