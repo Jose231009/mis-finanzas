@@ -254,6 +254,8 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
 .topes-lista .m b{color:var(--ink)}
 
 /* personal / agencia */
+.solo-per{display:none} .solo-personal .solo-per{display:block}
+.solo-personal #libroSeg,.solo-personal .seg.amb,.solo-personal .lbl-amb,.solo-personal .mover,.solo-personal .solo-ag,.solo-personal .chip.personal,.solo-personal .chip.agencia,.solo-personal i.pt{display:none !important}
 .pt{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
 .pt.per{background:#0B7FA8} .pt.age{background:#6A4BDB}
 .libro button{display:inline-flex;align-items:center}
@@ -374,7 +376,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
       <div class="row-a">
         <div class="card hello">
           <div class="orb" aria-hidden="true"></div>
-          <div style="position:relative"><div class="t1">Hola de nuevo,</div><h2>José</h2><p id="helloTxt">Cargá tus gastos e ingresos y mirá cuánto te queda para tu meta.</p></div>
+          <div style="position:relative"><div class="t1" id="helloT1">Hola de nuevo,</div><h2 id="helloName">José</h2><p id="helloTxt">Cargá tus gastos e ingresos y mirá cuánto te queda para tu meta.</p></div>
           <button class="link" data-add>Cargar un gasto <span aria-hidden="true">→</span></button>
         </div>
         <div class="card">
@@ -459,7 +461,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
         <div class="tbl"><table><thead><tr><th>Cobro</th><th class="hide-m">De quién</th><th>Próximo</th><th class="n hide-m">Monto</th><th class="n hide-m" data-disp>USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tCobros"></tbody></table></div>
       </div>
       <div class="card">
-        <div class="card-head"><div><h2>Pagos fijos y suscripciones</h2><div class="sub">Alquiler, luz, gas, tarjetas, colegio, apps de la agencia… Tocá «Pagué» cuando lo pagás y queda como gasto del mes.</div></div></div>
+        <div class="card-head"><div><h2>Pagos fijos y suscripciones</h2><div class="sub">Alquiler, luz, gas, tarjetas, colegio<span class="solo-ag">, apps de la agencia</span>… Tocá «Pagué» cuando lo pagás y queda como gasto del mes.</div></div></div>
         <div class="tbl"><table><thead><tr><th>Pago</th><th class="hide-m">De quién</th><th>Próximo</th><th class="n hide-m">Monto</th><th class="n hide-m" data-disp>USD</th><th>Este mes</th><th></th></tr></thead><tbody id="tFijos"></tbody></table></div>
       </div>
       <div class="card">
@@ -467,7 +469,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
         <form id="fFijo" autocomplete="off">
           <div class="f2">
             <label>Nombre<input id="fNombre" maxlength="60" required placeholder="Ej.: Alquiler, Sueldo, Claude"></label>
-            <label>De quién<select id="fAmbito"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
+            <label class="lbl-amb">De quién<select id="fAmbito"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
           </div>
           <label>Es un<select id="fTipo"><option value="gasto">Pago (sale plata)</option><option value="ingreso">Cobro (entra plata, ej. sueldo)</option></select></label>
           <div class="f3">
@@ -514,7 +516,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
           <div class="f2">
             <label id="dAcrL">A quién le debés<input id="dAcr" maxlength="60" placeholder="Banco, persona…"></label>
             <label id="dTarL" hidden>Tarjeta<select id="dTar"></select></label>
-            <label>De quién<select id="dAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
+            <label class="lbl-amb">De quién<select id="dAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
           </div>
           <div class="f3">
             <label>Total a pagar<input id="dTotal" type="number" inputmode="decimal" step="0.01" min="0" required></label>
@@ -548,7 +550,7 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
         <h3 style="font-size:.92rem;margin:18px 0 0">Poner o cambiar un tope</h3>
         <form id="fTope" autocomplete="off" style="margin-top:10px">
           <div class="f2">
-            <label>De quién<select id="tAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
+            <label class="lbl-amb">De quién<select id="tAmb"><option value="personal">Personal</option><option value="agencia">Agencia</option></select></label>
             <label>Qué gasto<select id="tCat"></select></label>
           </div>
           <div class="f3">
@@ -582,11 +584,11 @@ table.proy td{padding:9px 8px} table.proy tbody tr:nth-child(odd){background:rgb
         <div class="card-head"><div><h2>Tus tarjetas</h2><div class="sub">Aparecen en «Cómo pagaste» al cargar un gasto.</div></div></div>
         <div class="tarjetas" id="tarList"></div>
         <form id="fTar" autocomplete="off" style="grid-template-columns:minmax(0,1fr) auto;margin-top:14px">
-          <input id="tarNueva" maxlength="40" placeholder="Ej.: Amex, Visa de la agencia" aria-label="Nombre de la tarjeta nueva">
+          <input id="tarNueva" maxlength="40" placeholder="Ej.: Amex, Naranja" aria-label="Nombre de la tarjeta nueva">
           <button class="btn" type="submit">Agregar</button>
         </form>
       </div>
-      <div class="card"><h2>Ingresos de la agencia</h2><p class="muted" style="margin:6px 0 0">Los cobros de clientes se leen solos del CRM (facturas pagadas de cada mes), no hace falta cargarlos. Tu trabajo personal y otros ingresos sí: con el botón «+» → Ingreso.</p>
+      <div class="card"><h2 class="solo-ag">Ingresos de la agencia</h2><h2 class="solo-per">Tu cuenta</h2><p class="muted solo-ag" style="margin:6px 0 0">Los cobros de clientes se leen solos del CRM (facturas pagadas de cada mes), no hace falta cargarlos. Tu trabajo personal y otros ingresos sí: con el botón «+» → Ingreso.</p>
         <p class="hint" style="margin-top:10px"><button class="btn sm ghost" id="salir2">Salir de la cuenta</button></p></div>
     </section>
   </main>

@@ -16,7 +16,7 @@ const CATS = {
 const NO_SUMA = new Set(["Pago de tarjeta", "Ahorro"]); // el resumen de la tarjeta no suma (sus consumos se cargan uno por uno); el ahorro es plata que guardás, no un gasto
 const FIJAS = new Set(["Alquiler","Luz","Gas","Agua","Internet y teléfono","Impuestos y tasas","Limpieza"]);
 const MONEDAS = ["USD","EUR","ARS","MXN","COP","GBP","CLP"];
-const TARJETAS_DEF = ["Visa", "Mastercard", "Sra. Ana María"];
+const TARJETAS_DEF = ["Visa", "Mastercard"];
 const OTROS_PAGOS = ["Débito", "Efectivo", "Transferencia", "Bizum", "PayPal"];
 const CUOTAS_OPC = [1, 2, 3, 4, 5, 6, 9, 10, 12, 18, 24];
 const TIPOS_DEU = { cuotas: "Compra en cuotas", prestamo: "Préstamo o crédito", persona: "Deuda con una persona", otro: "Otra deuda" };
@@ -69,7 +69,14 @@ const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { retur
 const ddmm = (f) => `${String(f).slice(8, 10)}/${String(f).slice(5, 7)}`;
 
 const st = { user: null, demo: false, movs: [], crm: [], fijos: [], topes: [], inversiones: [], factur: [], ahorrando: false, deudas: [], pagosDeu: [], pagando: null, cfg: structuredClone(CFG_DEF), mes: mesDe(hoy()), vista: "resumen",
-  tipo: "gasto", ambito: "personal", cat: null, libro: "todo", q: "", borrando: null };
+  tipo: "gasto", ambito: "personal", cat: null, libro: "todo", q: "", borrando: null, agencia: true };
+// Solo los usuarios con fin_usuarios.agencia (José) ven la agencia y el CRM; el resto usa la app solo para lo personal.
+function modo() {
+  document.body.classList.toggle("solo-personal", !st.agencia);
+  if (!st.agencia) { st.libro = "personal"; ["fAmbito", "dAmb", "tAmb"].forEach(id => { if ($(id)) $(id).value = "personal"; }); }
+  const n = st.agencia ? "José" : ((st.user && st.user.user_metadata && st.user.user_metadata.nombre) || "");
+  $("helloName").textContent = n; $("helloName").hidden = !n; $("helloT1").textContent = n ? "Hola de nuevo," : "¡Hola de nuevo!";
+}
 
 function toast(t, ms = 2800) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), ms); }
 const enUSD = (monto, moneda) => (Number(monto) || 0) * Number((st.cfg.tasas || {})[moneda] ?? CFG_DEF.tasas[moneda] ?? 1);
@@ -104,7 +111,7 @@ async function entrar(user) {
 }
 async function cargar() {
   const desde = sumaMes(mesDe(hoy()), -14) + "-01";
-  const [m, f, c, r, d, pd, tp, iv, fc] = await Promise.all([
+  const [m, f, c, r, d, pd, tp, iv, fc, va] = await Promise.all([
     sb.from("fin_movimientos").select("*").gte("fecha", desde).order("fecha", { ascending: false }),
     sb.from("fin_fijos").select("*").order("dia"),
     sb.from("fin_config").select("*").maybeSingle(),
@@ -113,9 +120,11 @@ async function cargar() {
     sb.from("fin_movimientos").select("id,deuda_id,monto,fecha,cuota").not("deuda_id", "is", null),
     sb.from("fin_topes").select("*").order("creado"),
     sb.from("fin_inversiones").select("*").order("fecha"),
-    sb.rpc("fin_facturacion_crm", { desde: sumaMes(mesDe(hoy()), -3) + "-01" })
+    sb.rpc("fin_facturacion_crm", { desde: sumaMes(mesDe(hoy()), -3) + "-01" }),
+    sb.rpc("fin_ve_agencia")
   ]);
   if (m.error || f.error) { toast("Tu usuario no tiene acceso a estos datos."); }
+  st.agencia = va.data === true; modo();
   st.movs = m.data || []; st.fijos = f.data || []; st.deudas = d.data || []; st.pagosDeu = pd.data || []; st.topes = tp.data || []; st.inversiones = iv.data || []; st.factur = fc.data || [];
   if (c.data) st.cfg = { ...CFG_DEF, ...c.data, tarjetas: Array.isArray(c.data.tarjetas) ? c.data.tarjetas : TARJETAS_DEF, tasas: { ...CFG_DEF.tasas, ...(c.data.tasas || {}) } };
   metodos();
@@ -131,7 +140,7 @@ function nav() {
   $("tabs").innerHTML = VISTAS.map(([k, t, i]) => `<button data-go="${k}" ${st.vista === k ? 'aria-current="page"' : ""}>${svgIco(i, 20)}${esc(t.split(" ")[0])}</button>`).join("");
   document.querySelectorAll("[data-view]").forEach(s => (s.hidden = s.dataset.view !== st.vista));
   const t = VISTAS.find(v => v[0] === st.vista)[1]; $("crumb").textContent = t;
-  $("titulo").innerHTML = esc(t) + (st.libro === "todo" ? "" : ` <small class="${st.libro}">${NOM_AMB[st.libro]}</small>`);
+  $("titulo").innerHTML = esc(t) + (st.libro === "todo" || !st.agencia ? "" : ` <small class="${st.libro}">${NOM_AMB[st.libro]}</small>`);
   document.querySelectorAll("#libroSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.libro === st.libro));
   document.querySelectorAll("[data-disp]").forEach(th => (th.textContent = disp() === "ARS" ? "Pesos" : "USD"));
 }
@@ -202,7 +211,7 @@ function renderResumen() {
     personal: ["Ingresos personales", "Gastos personales", "Te queda", "Pagos fijos personales"],
     agencia: ["Cobros de la agencia", "Gastos de la agencia", "Ganancia de la agencia", "Pagos fijos de la agencia"] }[L];
   ["kIngT", "kGasT", "kAhoT", "kFijT"].forEach((id, i) => ($(id).textContent = ET[i]));
-  $("kIngT").title = L === "personal" ? `Incluye ${usd(t.ganancia)} que te dejó la agencia (cobros menos gastos de la agencia)` : "";
+  $("kIngT").title = L === "personal" && st.agencia ? `Incluye ${usd(t.ganancia)} que te dejó la agencia (cobros menos gastos de la agencia)` : "";
   const pv = previsto(m), pp = previsto(sumaMes(m, -1));
   $("kIng").innerHTML = esc(usd(pv.ingP)) + delta(pv.ingP, pp.ingP);
   $("kGas").innerHTML = esc(usd(pv.gasP)) + deltaGasto(pv.gasP, pp.gasP);
@@ -246,6 +255,8 @@ function renderResumen() {
   const falta = porCobrar.length ? ` Falta cobrar: ${porCobrar.map(f => `${f.nombre} (${usd(enUSD(f.monto, f.moneda))})`).join(", ")}.` : "";
   $("helloTxt").textContent = L === "agencia"
     ? (t.iA ? `Este mes la agencia cobró ${usd(t.iA)} y gastó ${usd(t.gA)}: te deja ${usd(t.ganancia)} (${margen} % de margen).` : `Todavía no hay cobros de clientes este mes. La agencia lleva gastados ${usd(t.gA)}.`)
+    : L === "personal" && !st.agencia
+    ? `Este mes entraron ${usd(t.iP)} y gastaste ${usd(t.gP)}: te quedan ${usd(aho)}.`
     : L === "personal"
     ? `La agencia te dejó ${usd(t.ganancia)}${t.iP ? ` y entraron ${usd(t.iP)} de lo tuyo` : ""}. En lo personal gastaste ${usd(t.gP)}: te quedan ${usd(aho)}.`
     : antes
@@ -334,7 +345,7 @@ function renderFijos(tb, completo, cobros = false) {
   if (cobros) $("cardCobros").hidden = !fs.length;
   if (!completo) $("fijSub").textContent = fs.length ? `${fs.length} pagos · ${usd(fs.reduce((s, x) => s + enUSD(x.f.monto, x.f.moneda), 0))} por mes` : "Todavía no cargaste ninguno";
   const cols = completo ? 7 : 5;
-  if (!fs.length) { tb.innerHTML = `<tr><td colspan="${cols}"><div class="empty">Cargá alquiler, luz, gas, tarjeta y las apps de la agencia en «Pagos fijos».</div></td></tr>`; return; }
+  if (!fs.length) { tb.innerHTML = `<tr><td colspan="${cols}"><div class="empty">Cargá alquiler, luz, gas, tarjeta${st.agencia ? " y las apps de la agencia" : " y tus suscripciones"} en «Pagos fijos».</div></td></tr>`; return; }
   tb.innerHTML = (completo ? fs : fs.slice(0, 6)).map(({ f, p }) => {
     const dias = Math.round((p - h0) / 864e5), cuando = dias === 0 ? "hoy" : dias > 0 && dias <= 7 ? `en ${dias} d` : "";
     const cobro = esCobro(f);
@@ -414,7 +425,8 @@ function renderProy() {
     return { mm, ent, sal, queda, plan, libre: queda - plan, acum, notas: cambiosDelMes(mm, L) };
   });
   const prom = filas.reduce((a, f) => a + f.libre, 0) / filas.length, neg = filas.filter(f => f.libre < 0).length;
-  $("proySub").textContent = `${L === "personal" ? "Tu sueldo más lo que te deja la agencia" : L === "agencia" ? "Agencia" : "Todo junto"} · clientes estimados en ${usdFijo(crm)} por mes (promedio facturado de los últimos 3 meses) · tarjetas por el resumen`;
+  $("proySub").textContent = !st.agencia ? "Tus cobros y pagos fijos, cuotas y deudas · tarjetas por el resumen"
+    : `${L === "personal" ? "Tu sueldo más lo que te deja la agencia" : L === "agencia" ? "Agencia" : "Todo junto"} · clientes estimados en ${usdFijo(crm)} por mes (promedio facturado de los últimos 3 meses) · tarjetas por el resumen`;
   const sinFecha = st.deudas.filter(d => d.activo !== false && (L === "todo" || d.ambito === L) && d.tipo !== "cuotas" && !(Number(d.cuota_monto) > 0) && !estadoDeuda(d).terminada);
   const resumen = conMeta
     ? `Si separás <b>${esc(usdFijo(Math.ceil(MP.porMes / 10) * 10))}</b> por mes, en ${esc(mesCorto(MP.fmeta))} llegás a tu meta de <b>${esc(usdFijo(MP.meta))}</b>${MP.ahorrado ? ` (ya llevás ${esc(usdFijo(MP.ahorrado))})` : ""}. Después de separar el ahorro te quedan libres en promedio <b class="${prom >= 0 ? "pos" : "neg"}">${esc(usd(prom))}</b> por mes${neg ? ` (ojo: ${neg} ${neg === 1 ? "mes da" : "meses dan"} negativo)` : ""}.`
@@ -627,7 +639,7 @@ function renderMovs() {
   if (st.q) { const q = st.q.toLowerCase(); xs = xs.filter(x => `${x.concepto || ""} ${x.categoria || ""}`.toLowerCase().includes(q)); }
   xs.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.creado || "").localeCompare(String(a.creado || "")));
   const t = totales(st.mes), ent = st.libro === "personal" ? t.iP : t.ing;
-  $("movSub").textContent = `${xs.length} movimientos · entra ${usd(ent)} · sale ${usd(t.gas)}${st.libro === "personal" ? " (sin contar lo que te deja la agencia)" : ""}`;
+  $("movSub").textContent = `${xs.length} movimientos · entra ${usd(ent)} · sale ${usd(t.gas)}${st.libro === "personal" && st.agencia ? " (sin contar lo que te deja la agencia)" : ""}`;
   $("tMovs").innerHTML = xs.length ? xs.map(x => { const ing = x.tipo === "ingreso", crm = x.origen === "crm";
     const enCuotas = x.cuotas > 1 && x.deuda_id && st.deudas.some(d => d.id === x.deuda_id && d.tipo === "cuotas");
     const borrar = crm ? `<span class="chip">CRM</span>` : st.borrando === "m:" + x.id
@@ -807,6 +819,7 @@ document.addEventListener("click", async (e) => {
     toast(error ? "No se pudo borrar." : "Topes borrados"); await cargar(); formTope(true); return;
   }
   if (b.dataset.libro) {
+    if (!st.agencia) return;
     st.libro = b.dataset.libro; ls.set("mf-libro", st.libro); st.borrando = null;
     if (st.libro !== "todo") { $("fAmbito").value = st.libro; refrescarFCat(); $("dAmb").value = st.libro; }
     render(); return;
@@ -896,7 +909,13 @@ function demo() {
   metodos();
   const guardarNada = async () => toast("Modo ejemplo: no se guarda nada.");
   ["fMov", "fFijo", "fCfg", "fDeu", "fTar", "fTope", "fInv"].forEach(id => $(id).addEventListener("submit", e => { e.stopImmediatePropagation(); e.preventDefault(); guardarNada(); }, true));
-  render();
+  // #demo-personal: cómo lo ve alguien sin agencia (solo lo personal)
+  if (location.hash.startsWith("#demo-personal")) {
+    const p = (x) => x.ambito !== "agencia"; st.agencia = false; st.crm = []; st.factur = [];
+    st.movs = st.movs.filter(p); st.fijos = st.fijos.filter(p); st.deudas = st.deudas.filter(p); st.topes = st.topes.filter(p);
+    st.pagosDeu = st.pagosDeu.filter(x => st.deudas.some(d => d.id === x.deuda_id));
+  }
+  modo(); render();
 }
 // #demo o #demo/ajustes, #demo/deudas…: datos de ejemplo abiertos en esa vista
 if (location.hash.startsWith("#demo")) { const v = location.hash.split("/")[1]; if (VISTAS.some(x => x[0] === v)) st.vista = v; demo(); } else iniciar();
